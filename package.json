@@ -17,5 +17,8 @@
   "bugs": {
     "url": "https://github.com/Vigneshgbe/CRM_Insurance_Company/issues"
   },
-  "homepage": "https://github.com/Vigneshgbe/CRM_Insurance_Company#readme"
+  "homepage": "https://github.com/Vigneshgbe/CRM_Insurance_Company#readme",
+  "devDependencies": {
+    "typescript": "^5.9.3"
+  }
 }
