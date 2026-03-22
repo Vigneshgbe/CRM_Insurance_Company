@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { useNavigate } from "react-router-dom";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
@@ -7,22 +8,55 @@ import { getDocumentsByCaseId } from "@/data/mockData";
 import { DOCUMENT_CATEGORIES } from "@/lib/constants";
 import { formatDate } from "@/lib/formatters";
 import { useToast } from "@/hooks/use-toast";
-import { Upload, Eye, Download, Trash2, FileText } from "lucide-react";
+import { Upload, Eye, Download, Trash2, FileText, DollarSign, FileCheck, ClipboardList, ArrowRight } from "lucide-react";
+import TemplateFillModal from "@/components/templates/TemplateFillModal";
+
+const TEMPLATE_CARDS = [
+  { id: "ocf-6", name: "OCF-6 Expenses Claim", icon: DollarSign },
+  { id: "ocf-10", name: "OCF-10 Election of Benefits", icon: FileCheck },
+  { id: "matrix-intake", name: "Matrix Intake Form", icon: ClipboardList },
+];
 
 export default function DocumentsTab({ caseId }: { caseId: string }) {
   const docs = getDocumentsByCaseId(caseId);
   const [filter, setFilter] = useState("all");
   const { toast } = useToast();
+  const navigate = useNavigate();
   const filtered = filter === "all" ? docs : docs.filter((d) => d.category === filter);
-
-  const templates = [
-    { name: "OCF-6 Expenses Claim Form", endpoint: "/api/export/ocf-6" },
-    { name: "OCF-10 Election of Benefits", endpoint: "/api/export/ocf-10" },
-    { name: "Matrix Intake Form", endpoint: "/api/export/intake" },
-  ];
+  const [fillModal, setFillModal] = useState<{ open: boolean; templateId: string; templateName: string }>({ open: false, templateId: "", templateName: "" });
 
   return (
     <div className="space-y-4">
+      {/* PDF Templates Section */}
+      <Card>
+        <CardHeader className="pb-3">
+          <CardTitle className="text-base">PDF Templates</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+            {TEMPLATE_CARDS.map((t) => (
+              <div key={t.id} className="border rounded-lg p-3 flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <t.icon className="h-4 w-4 text-primary" />
+                  <span className="text-xs font-medium">{t.name}</span>
+                </div>
+                <Button size="sm" variant="outline" className="text-xs h-7" onClick={() => setFillModal({ open: true, templateId: t.id, templateName: t.name })}>
+                  Fill & Export
+                </Button>
+              </div>
+            ))}
+            <div
+              className="border-2 border-dashed rounded-lg p-3 flex items-center justify-center gap-2 cursor-pointer hover:border-primary/50 text-muted-foreground hover:text-foreground transition-colors"
+              onClick={() => navigate("/templates")}
+            >
+              <span className="text-xs font-medium">More Templates</span>
+              <ArrowRight className="h-3.5 w-3.5" />
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Documents Table */}
       <Card>
         <CardHeader className="pb-3 flex flex-row items-center justify-between">
           <CardTitle className="text-base">Documents</CardTitle>
@@ -70,24 +104,15 @@ export default function DocumentsTab({ caseId }: { caseId: string }) {
         </CardContent>
       </Card>
 
-      <Card>
-        <CardHeader className="pb-3"><CardTitle className="text-base">PDF Template Export</CardTitle></CardHeader>
-        <CardContent>
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-            {templates.map((t) => (
-              <div key={t.name} className="border rounded p-3 flex items-center justify-between">
-                <div className="flex items-center gap-2">
-                  <FileText className="h-4 w-4 text-primary" />
-                  <span className="text-sm font-medium">{t.name}</span>
-                </div>
-                <Button size="sm" variant="outline" onClick={() => toast({ title: "Export", description: `${t.name} export initiated.` })}>
-                  Export PDF
-                </Button>
-              </div>
-            ))}
-          </div>
-        </CardContent>
-      </Card>
+      {/* Fill & Export Modal */}
+      {fillModal.open && (
+        <TemplateFillModal
+          templateId={fillModal.templateId}
+          templateName={fillModal.templateName}
+          caseId={caseId}
+          onClose={() => setFillModal({ open: false, templateId: "", templateName: "" })}
+        />
+      )}
     </div>
   );
 }

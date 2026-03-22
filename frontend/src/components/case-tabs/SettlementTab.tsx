@@ -7,6 +7,7 @@ import { useToast } from "@/hooks/use-toast";
 import { useState, useEffect } from "react";
 import { getSettlementByCaseId } from "@/data/mockData";
 import { formatCurrency } from "@/lib/formatters";
+import { cn } from "@/lib/utils";
 
 export default function SettlementTab({ caseId }: { caseId: string }) {
   const { toast } = useToast();
@@ -16,20 +17,23 @@ export default function SettlementTab({ caseId }: { caseId: string }) {
 
   const values = watch();
 
+  const fs = Number(values.finalSettlement) || 0;
+  const fee = Number(values.ourFee) || 0;
+  const rehab = Number(values.rehabOutstanding) || 0;
+  const assess = Number(values.assessmentOutstanding) || 0;
+  const o3 = Number(values.outstanding3) || 0;
+  const o4 = Number(values.outstanding4) || 0;
+  const hst = Number(values.hst) || 0;
+  const feeHst = Number(values.ourFeeHst) || 0;
+
+  const totalDeductions = fee + rehab + assess + o3 + o4 + hst + feeHst;
+  const payToClient = fs - totalDeductions;
+  const finalAccount = fee + feeHst;
+
   useEffect(() => {
-    const fs = Number(values.finalSettlement) || 0;
-    const fee = Number(values.ourFee) || 0;
-    const rehab = Number(values.rehabOutstanding) || 0;
-    const assess = Number(values.assessmentOutstanding) || 0;
-    const o3 = Number(values.outstanding3) || 0;
-    const o4 = Number(values.outstanding4) || 0;
-    const hst = Number(values.hst) || 0;
-    const feeHst = Number(values.ourFeeHst) || 0;
-    const pay = fs - fee - rehab - assess - o3 - o4 - hst;
-    const finalAccount = fee + feeHst;
-    setValue("payToClient", pay);
+    setValue("payToClient", payToClient);
     setValue("ourFinalAccount", finalAccount);
-  }, [values.finalSettlement, values.ourFee, values.rehabOutstanding, values.assessmentOutstanding, values.outstanding3, values.outstanding4, values.hst, values.ourFeeHst, setValue]);
+  }, [payToClient, finalAccount, setValue]);
 
   const onSubmit = () => {
     setLoading(true);
@@ -37,11 +41,16 @@ export default function SettlementTab({ caseId }: { caseId: string }) {
   };
 
   const F = ({ label, name, readOnly = false, highlight = false }: { label: string; name: string; readOnly?: boolean; highlight?: boolean }) => (
-    <div className={highlight ? "p-2 rounded bg-success/10 border border-success/20" : ""}>
-      <Label className={`text-xs ${highlight ? "text-success font-medium" : ""}`}>{label}</Label>
+    <div className={cn(highlight ? "p-3 rounded-lg bg-green-50 border border-green-200" : "")}>
+      <Label className={cn("text-xs", highlight ? "text-green-700 font-semibold" : "")}>{label}</Label>
       <div className="relative mt-1">
-        <span className="absolute left-2 top-1/2 -translate-y-1/2 text-xs text-muted-foreground">$</span>
-        <Input {...register(name as any)} type="number" className="h-8 text-xs pl-5" readOnly={readOnly} />
+        <span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-xs text-muted-foreground">$</span>
+        <Input
+          {...register(name as any)}
+          type="number"
+          className={cn("h-9 text-sm pl-6", readOnly ? "bg-muted" : "", highlight ? "text-green-700 font-bold text-base bg-green-50 border-green-300" : "")}
+          readOnly={readOnly}
+        />
       </div>
     </div>
   );
@@ -51,7 +60,7 @@ export default function SettlementTab({ caseId }: { caseId: string }) {
       <Card>
         <CardHeader className="pb-2"><CardTitle className="text-sm">Settlement Proposal</CardTitle></CardHeader>
         <CardContent>
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3 max-w-4xl">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 max-w-4xl">
             <F label="Final Settlement Amount" name="finalSettlement" />
             <F label="Our Fee Herein" name="ourFee" />
             <F label="Rehab Outstanding" name="rehabOutstanding" />
@@ -65,7 +74,30 @@ export default function SettlementTab({ caseId }: { caseId: string }) {
           </div>
         </CardContent>
       </Card>
-      <div className="flex justify-end mt-4">
+
+      {/* Settlement Summary */}
+      <Card className="mt-4">
+        <CardContent className="p-6">
+          <h3 className="text-sm font-semibold mb-4">Settlement Summary</h3>
+          <div className="max-w-md space-y-2">
+            <div className="flex justify-between text-sm">
+              <span>Final Settlement:</span>
+              <span className="font-medium">{formatCurrency(fs)}</span>
+            </div>
+            <div className="flex justify-between text-sm">
+              <span>Total Deductions:</span>
+              <span className="font-medium text-destructive">-{formatCurrency(totalDeductions)}</span>
+            </div>
+            <div className="border-t my-2" />
+            <div className="flex justify-between text-lg font-bold text-green-700">
+              <span>Pay to Client:</span>
+              <span>{formatCurrency(payToClient)}</span>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+
+      <div className="sticky bottom-0 bg-background border-t py-3 mt-4 flex justify-end">
         <Button type="submit" disabled={loading}>{loading ? "Saving..." : "Save Settlement"}</Button>
       </div>
     </form>

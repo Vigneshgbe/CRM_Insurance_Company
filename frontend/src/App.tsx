@@ -5,8 +5,10 @@ import Login from "./pages/Login";
 import Dashboard from "./pages/Dashboard";
 import Clients from "./pages/Clients";
 import NewClient from "./pages/NewClient";
+import Cases from "./pages/Cases";
 import CaseDetail from "./pages/CaseDetail";
 import Documents from "./pages/Documents";
+import Templates from "./pages/Templates";
 import Reports from "./pages/Reports";
 import Settings from "./pages/Settings";
 import NotFound from "./pages/NotFound";
@@ -23,7 +25,9 @@ const App = () => (
         <Route path="/dashboard" element={<Dashboard />} />
         <Route path="/clients" element={<Clients />} />
         <Route path="/clients/new" element={<NewClient />} />
+        <Route path="/cases" element={<Cases />} />
         <Route path="/documents" element={<Documents />} />
+        <Route path="/templates" element={<Templates />} />
         <Route path="/cases/:caseId" element={<CaseDetail />} />
         <Route path="/cases/:caseId/:tab" element={<CaseDetail />} />
         <Route path="/reports" element={<Reports />} />

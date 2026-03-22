@@ -1,12 +1,13 @@
 import { Link, useLocation } from "react-router-dom";
-import { LayoutDashboard, Users, FolderOpen, FileText, BarChart3, Settings, LogOut } from "lucide-react";
+import { LayoutDashboard, Users, FolderOpen, FileText, FileTextIcon, BarChart3, Settings, LogOut } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 const navItems = [
   { label: "Dashboard", icon: LayoutDashboard, path: "/dashboard" },
   { label: "Clients", icon: Users, path: "/clients" },
-  { label: "Cases", icon: FolderOpen, path: "/cases/1" },
+  { label: "Cases", icon: FolderOpen, path: "/cases" },
   { label: "Documents", icon: FileText, path: "/documents" },
+  { label: "Templates", icon: FileTextIcon, path: "/templates" },
   { label: "Reports", icon: BarChart3, path: "/reports" },
   { label: "Settings", icon: Settings, path: "/settings" },
 ];
