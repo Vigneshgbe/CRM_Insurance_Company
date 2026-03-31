@@ -5,6 +5,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { useToast } from "@/hooks/use-toast";
+import { useAuth } from "@/lib/auth";
 
 export default function Login() {
   const [email, setEmail] = useState("");
@@ -13,17 +14,26 @@ export default function Login() {
   const [error, setError] = useState("");
   const navigate = useNavigate();
   const { toast } = useToast();
+  const { login } = useAuth();
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError("");
     setLoading(true);
-    setTimeout(() => {
-      if (email === "admin@hypernova.com" && password === "password") {
+
+    setTimeout(async () => {
+      const success = await login(email, password);
+      if (success) {
+        const stored = sessionStorage.getItem("crm_user");
+        const user = stored ? JSON.parse(stored) : null;
         toast({ title: "Welcome back!", description: "Logged in successfully." });
-        navigate("/dashboard");
+        if (user?.role === "client") {
+          navigate("/portal");
+        } else {
+          navigate("/dashboard");
+        }
       } else {
-        setError("Invalid email or password. Try admin@hypernova.com / password");
+        setError("Invalid credentials. Try: admin@hypernova.com / password (employee) or james.morrison@email.com / password (client)");
       }
       setLoading(false);
     }, 800);
@@ -51,6 +61,12 @@ export default function Login() {
               {loading ? "Signing in..." : "Sign In"}
             </Button>
           </form>
+          <div className="mt-4 border-t pt-3">
+            <p className="text-xs text-muted-foreground text-center mb-1">Demo Accounts:</p>
+            <p className="text-xs text-muted-foreground text-center">Employee: admin@hypernova.com</p>
+            <p className="text-xs text-muted-foreground text-center">Client: james.morrison@email.com</p>
+            <p className="text-xs text-muted-foreground text-center">Password: password</p>
+          </div>
         </CardContent>
       </Card>
     </div>
