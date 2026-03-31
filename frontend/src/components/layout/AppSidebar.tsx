@@ -1,6 +1,7 @@
-import { Link, useLocation } from "react-router-dom";
+import { Link, useLocation, useNavigate } from "react-router-dom";
 import { LayoutDashboard, Users, FolderOpen, FileText, FileTextIcon, BarChart3, Settings, LogOut } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { useAuth } from "@/lib/auth";
 
 const navItems = [
   { label: "Dashboard", icon: LayoutDashboard, path: "/dashboard" },
@@ -14,6 +15,16 @@ const navItems = [
 
 export function AppSidebar() {
   const location = useLocation();
+  const navigate = useNavigate();
+  const { user, logout } = useAuth();
+
+  const handleLogout = () => {
+    logout();
+    navigate("/login");
+  };
+
+  const displayName = user?.name || "Amanda Singh";
+  const initials = displayName.split(" ").map((n) => n[0]).join("");
 
   return (
     <aside className="hidden md:flex flex-col w-60 min-h-screen bg-sidebar text-sidebar-foreground fixed left-0 top-0 z-30">
@@ -40,14 +51,14 @@ export function AppSidebar() {
       </nav>
       <div className="border-t border-sidebar-muted p-4">
         <div className="flex items-center gap-3">
-          <div className="h-8 w-8 rounded-full bg-sidebar-accent flex items-center justify-center text-xs font-semibold text-sidebar-foreground">AS</div>
+          <div className="h-8 w-8 rounded-full bg-sidebar-accent flex items-center justify-center text-xs font-semibold text-sidebar-foreground">{initials}</div>
           <div className="flex-1 min-w-0">
-            <p className="text-sm font-medium truncate">Amanda Singh</p>
-            <p className="text-xs text-sidebar-foreground/60">Admin</p>
+            <p className="text-sm font-medium truncate">{displayName}</p>
+            <p className="text-xs text-sidebar-foreground/60">{user?.role === "employee" ? "Admin" : "Client"}</p>
           </div>
-          <Link to="/login" className="text-sidebar-foreground/60 hover:text-sidebar-foreground">
+          <button onClick={handleLogout} className="text-sidebar-foreground/60 hover:text-sidebar-foreground">
             <LogOut className="h-4 w-4" />
-          </Link>
+          </button>
         </div>
       </div>
     </aside>
