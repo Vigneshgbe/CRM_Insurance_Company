@@ -24,6 +24,7 @@ export interface CaseRecord {
   dateOfLoss: string;
   openDate: string;
   referredBy: string;
+  referredById?: string;
   clerkAssigned: string;
   secretary: string;
   limitationDate: string;
@@ -36,6 +37,20 @@ export interface CaseRecord {
   tortFileNo: string;
   closedFileNo: string;
   client: Client;
+  // New fields
+  clientSignatureUrl?: string;
+  clientInitials?: string;
+  clientStreet?: string;
+  clientCity?: string;
+  clientState?: string;
+  clientZip?: string;
+  clientCountry?: string;
+}
+
+export interface Referrer {
+  id: string;
+  name: string;
+  type: string;
 }
 
 export interface Note {
@@ -98,6 +113,20 @@ export interface StatusEntry {
   changedBy: string;
 }
 
+// Referrers list
+export const referrers: Referrer[] = [
+  { id: "r1", name: "Dr. Williams", type: "Physician" },
+  { id: "r2", name: "Ahmed & Partners", type: "Law Firm" },
+  { id: "r3", name: "Walk-in", type: "Direct" },
+  { id: "r4", name: "Google Search", type: "Online" },
+  { id: "r5", name: "Client Referral", type: "Referral" },
+  { id: "r6", name: "Dr. Sarah Ahmed", type: "Physician" },
+  { id: "r7", name: "Insurance Broker Network", type: "Broker" },
+  { id: "r8", name: "Community Legal Clinic", type: "Legal Aid" },
+  { id: "r9", name: "Physiotherapy Plus", type: "Clinic" },
+  { id: "r10", name: "Hospital ER Referral", type: "Hospital" },
+];
+
 const clients: Client[] = [
   { id: "c1", firstName: "James", lastName: "Morrison", initial: "R", address: "142 Queen Street West", city: "Toronto", province: "Ontario", postCode: "M5H 2N5", homePhone: "4165551234", cellPhone: "4165559876", workPhone: "4165554321", email: "james.morrison@email.com", dateOfBirth: "1985-03-15", maritalStatus: "Married", dependants: 2 },
   { id: "c2", firstName: "Sarah", lastName: "Chen", initial: "L", address: "88 Yonge Street", city: "Toronto", province: "Ontario", postCode: "M5C 1T4", homePhone: "4165552345", cellPhone: "4165558765", workPhone: "", email: "sarah.chen@email.com", dateOfBirth: "1990-07-22", maritalStatus: "Single", dependants: 0 },
@@ -107,11 +136,11 @@ const clients: Client[] = [
 ];
 
 export const cases: CaseRecord[] = [
-  { id: "1", clientId: "c1", fileNo: "MVA-2024-1001", fileStatus: "Active", dateOfLoss: "2024-06-15", openDate: "2024-06-20", referredBy: "Dr. Williams", clerkAssigned: "Amanda Singh", secretary: "Lisa Park", limitationDate: "2026-06-15", mediationStatus: "Pending", arbitrationStatus: "N/A", mvaClientFault: "No", benefitsClaiming: "Yes", irbNonEarnerDue: "Yes", thirdPartyLawyer: "Robert Lee", tortFileNo: "TORT-2024-501", closedFileNo: "", client: clients[0] },
-  { id: "2", clientId: "c2", fileNo: "MVA-2024-1002", fileStatus: "Active", dateOfLoss: "2024-08-03", openDate: "2024-08-10", referredBy: "Walk-in", clerkAssigned: "John Baker", secretary: "Lisa Park", limitationDate: "2026-04-01", mediationStatus: "N/A", arbitrationStatus: "N/A", mvaClientFault: "No", benefitsClaiming: "Yes", irbNonEarnerDue: "No", thirdPartyLawyer: "Karen White", tortFileNo: "TORT-2024-502", closedFileNo: "", client: clients[1] },
-  { id: "3", clientId: "c3", fileNo: "MVA-2023-0987", fileStatus: "Litigation", dateOfLoss: "2023-02-14", openDate: "2023-02-28", referredBy: "Ahmed & Partners", clerkAssigned: "Amanda Singh", secretary: "Maria Costa", limitationDate: "2025-02-14", mediationStatus: "Completed", arbitrationStatus: "Scheduled", mvaClientFault: "No", benefitsClaiming: "Yes", irbNonEarnerDue: "Yes", thirdPartyLawyer: "Steven Grant", tortFileNo: "TORT-2023-320", closedFileNo: "", client: clients[2] },
-  { id: "4", clientId: "c4", fileNo: "MVA-2024-1045", fileStatus: "Pending", dateOfLoss: "2024-11-20", openDate: "2024-11-25", referredBy: "Google Search", clerkAssigned: "John Baker", secretary: "Maria Costa", limitationDate: "2026-03-25", mediationStatus: "N/A", arbitrationStatus: "N/A", mvaClientFault: "Yes", benefitsClaiming: "No", irbNonEarnerDue: "No", thirdPartyLawyer: "", tortFileNo: "", closedFileNo: "", client: clients[3] },
-  { id: "5", clientId: "c5", fileNo: "MVA-2023-0845", fileStatus: "Settled", dateOfLoss: "2023-05-10", openDate: "2023-05-15", referredBy: "Client Referral", clerkAssigned: "Amanda Singh", secretary: "Lisa Park", limitationDate: "2025-05-10", mediationStatus: "Completed", arbitrationStatus: "N/A", mvaClientFault: "No", benefitsClaiming: "Yes", irbNonEarnerDue: "Yes", thirdPartyLawyer: "Jennifer Adams", tortFileNo: "TORT-2023-290", closedFileNo: "CLO-2025-112", client: clients[4] },
+  { id: "1", clientId: "c1", fileNo: "MVA-2024-1001", fileStatus: "Active", dateOfLoss: "2024-06-15", openDate: "2024-06-20", referredBy: "Dr. Williams", referredById: "r1", clerkAssigned: "Amanda Singh", secretary: "Lisa Park", limitationDate: "2026-06-15", mediationStatus: "Pending", arbitrationStatus: "N/A", mvaClientFault: "No", benefitsClaiming: "Yes", irbNonEarnerDue: "Yes", thirdPartyLawyer: "Robert Lee", tortFileNo: "TORT-2024-501", closedFileNo: "", client: clients[0], clientInitials: "JM", clientStreet: "142 Queen Street West", clientCity: "Toronto", clientState: "Ontario", clientZip: "M5H 2N5", clientCountry: "Canada" },
+  { id: "2", clientId: "c2", fileNo: "MVA-2024-1002", fileStatus: "Active", dateOfLoss: "2024-08-03", openDate: "2024-08-10", referredBy: "Walk-in", referredById: "r3", clerkAssigned: "John Baker", secretary: "Lisa Park", limitationDate: "2026-04-01", mediationStatus: "N/A", arbitrationStatus: "N/A", mvaClientFault: "No", benefitsClaiming: "Yes", irbNonEarnerDue: "No", thirdPartyLawyer: "Karen White", tortFileNo: "TORT-2024-502", closedFileNo: "", client: clients[1], clientInitials: "SC", clientStreet: "88 Yonge Street", clientCity: "Toronto", clientState: "Ontario", clientZip: "M5C 1T4", clientCountry: "Canada" },
+  { id: "3", clientId: "c3", fileNo: "MVA-2023-0987", fileStatus: "Litigation", dateOfLoss: "2023-02-14", openDate: "2023-02-28", referredBy: "Ahmed & Partners", referredById: "r2", clerkAssigned: "Amanda Singh", secretary: "Maria Costa", limitationDate: "2025-02-14", mediationStatus: "Completed", arbitrationStatus: "Scheduled", mvaClientFault: "No", benefitsClaiming: "Yes", irbNonEarnerDue: "Yes", thirdPartyLawyer: "Steven Grant", tortFileNo: "TORT-2023-320", closedFileNo: "", client: clients[2], clientInitials: "MP", clientStreet: "305 Dundas Street", clientCity: "Mississauga", clientState: "Ontario", clientZip: "L5B 1H3", clientCountry: "Canada" },
+  { id: "4", clientId: "c4", fileNo: "MVA-2024-1045", fileStatus: "Pending", dateOfLoss: "2024-11-20", openDate: "2024-11-25", referredBy: "Google Search", referredById: "r4", clerkAssigned: "John Baker", secretary: "Maria Costa", limitationDate: "2026-03-25", mediationStatus: "N/A", arbitrationStatus: "N/A", mvaClientFault: "Yes", benefitsClaiming: "No", irbNonEarnerDue: "No", thirdPartyLawyer: "", tortFileNo: "", closedFileNo: "", client: clients[3], clientInitials: "ER", clientStreet: "72 King Street", clientCity: "Hamilton", clientState: "Ontario", clientZip: "L8P 4V2", clientCountry: "Canada" },
+  { id: "5", clientId: "c5", fileNo: "MVA-2023-0845", fileStatus: "Settled", dateOfLoss: "2023-05-10", openDate: "2023-05-15", referredBy: "Client Referral", referredById: "r5", clerkAssigned: "Amanda Singh", secretary: "Lisa Park", limitationDate: "2025-05-10", mediationStatus: "Completed", arbitrationStatus: "N/A", mvaClientFault: "No", benefitsClaiming: "Yes", irbNonEarnerDue: "Yes", thirdPartyLawyer: "Jennifer Adams", tortFileNo: "TORT-2023-290", closedFileNo: "CLO-2025-112", client: clients[4], clientInitials: "DT", clientStreet: "1200 Bay Street", clientCity: "Toronto", clientState: "Ontario", clientZip: "M5R 2A5", clientCountry: "Canada" },
 ];
 
 export const notes: Note[] = [
