@@ -64,7 +64,7 @@ export default function Login() {
           <div className="mt-4 border-t pt-3">
             <p className="text-xs text-muted-foreground text-center mb-1">Demo Accounts:</p>
             <p className="text-xs text-muted-foreground text-center">Employee: admin@hypernova.com</p>
-            <p className="text-xs text-muted-foreground text-center">Client: james.morrison@email.com</p>
+            {/* <p className="text-xs text-muted-foreground text-center">Client: james.morrison@email.com</p> */}
             <p className="text-xs text-muted-foreground text-center">Password: password</p>
           </div>
         </CardContent>
