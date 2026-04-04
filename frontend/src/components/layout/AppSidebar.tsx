@@ -1,5 +1,5 @@
 import { Link, useLocation, useNavigate } from "react-router-dom";
-import { LayoutDashboard, Users, FolderOpen, FileText, FileTextIcon, BarChart3, Settings, LogOut } from "lucide-react";
+import { LayoutDashboard, Users, FolderOpen, FileText, FileTextIcon, FileEdit, BarChart3, Settings, LogOut } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/lib/auth";
 
@@ -9,6 +9,7 @@ const navItems = [
   { label: "Cases", icon: FolderOpen, path: "/cases" },
   { label: "Documents", icon: FileText, path: "/documents" },
   { label: "Templates", icon: FileTextIcon, path: "/templates" },
+  { label: "Editor", icon: FileEdit, path: "/editor" },
   { label: "Reports", icon: BarChart3, path: "/reports" },
   { label: "Settings", icon: Settings, path: "/settings" },
 ];
