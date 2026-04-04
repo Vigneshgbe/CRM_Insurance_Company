@@ -6,6 +6,53 @@ export const PROVINCES = [
 
 export const MARITAL_STATUSES = ["Single", "Married", "Common-Law", "Separated", "Divorced", "Widow"];
 
+export const CASE_TYPES = [
+  "Motor Vehicle Accident (MVA)",
+  "Slip and Fall",
+  "Traffic Accident",
+  "Immigration",
+] as const;
+
+export type CaseType = typeof CASE_TYPES[number];
+
+// Hierarchical document categories
+export interface DocumentCategory {
+  id: string;
+  name: string;
+  parentId: string | null;
+  level: number;
+  children?: DocumentCategory[];
+}
+
+export const DOCUMENT_CATEGORY_TREE: DocumentCategory[] = [
+  {
+    id: "mva", name: "Motor Vehicle (MVA)", parentId: null, level: 0, children: [
+      {
+        id: "mva-ab", name: "AB (Accident Benefits)", parentId: "mva", level: 1, children: [
+          { id: "mva-ab-insurance", name: "Insurance", parentId: "mva-ab", level: 2 },
+          { id: "mva-ab-family-doctor", name: "Medical - Family Doctor", parentId: "mva-ab", level: 2 },
+          { id: "mva-ab-assessment", name: "Assessment Report", parentId: "mva-ab", level: 2 },
+          {
+            id: "mva-ab-specialist", name: "Specialist Report", parentId: "mva-ab", level: 2, children: [
+              { id: "mva-ab-specialist-neuro", name: "Neurological", parentId: "mva-ab-specialist", level: 3 },
+              { id: "mva-ab-specialist-mental", name: "Mental Health", parentId: "mva-ab-specialist", level: 3 },
+              { id: "mva-ab-specialist-ortho", name: "Orthopedic", parentId: "mva-ab-specialist", level: 3 },
+              { id: "mva-ab-specialist-other", name: "Other", parentId: "mva-ab-specialist", level: 3 },
+            ]
+          },
+          { id: "mva-ab-ireport", name: "I Report", parentId: "mva-ab", level: 2 },
+          { id: "mva-ab-police", name: "Police Report", parentId: "mva-ab", level: 2 },
+          { id: "mva-ab-other", name: "Other Documents", parentId: "mva-ab", level: 2 },
+        ]
+      },
+      { id: "mva-tort", name: "Tort", parentId: "mva", level: 1 },
+    ]
+  },
+  { id: "slip-fall", name: "Slip and Fall", parentId: null, level: 0 },
+  { id: "traffic", name: "Traffic Accident", parentId: null, level: 0 },
+  { id: "immigration", name: "Immigration", parentId: null, level: 0 },
+];
+
 export const FILE_STATUSES = ["Active", "Closed", "Pending", "On Hold", "Settled", "Litigation", "Mediation", "Arbitration"];
 
 export const ACTIVITY_TYPES = ["Note", "Task", "Call", "Email", "Appointment"] as const;

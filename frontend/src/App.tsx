@@ -11,7 +11,7 @@ import Cases from "./pages/Cases";
 import CaseDetail from "./pages/CaseDetail";
 import Documents from "./pages/Documents";
 import Templates from "./pages/Templates";
-import TemplateEditor from "./pages/TemplateEditor";
+// import TemplateEditor from "./pages/TemplateEditor";
 import DocumentEditor from "./pages/DocumentEditor";
 import Reports from "./pages/Reports";
 import Settings from "./pages/Settings";
@@ -35,7 +35,7 @@ const App = () => (
           <Route path="/cases" element={<AuthGuard allowedRoles={["employee"]}><Cases /></AuthGuard>} />
           <Route path="/documents" element={<AuthGuard allowedRoles={["employee"]}><Documents /></AuthGuard>} />
           <Route path="/templates" element={<AuthGuard allowedRoles={["employee"]}><Templates /></AuthGuard>} />
-          <Route path="/templates/editor" element={<AuthGuard allowedRoles={["employee"]}><TemplateEditor /></AuthGuard>} />
+          {/* <Route path="/templates/editor" element={<AuthGuard allowedRoles={["employee"]}><TemplateEditor /></AuthGuard>} /> */}
           <Route path="/editor" element={<AuthGuard allowedRoles={["employee"]}><DocumentEditor /></AuthGuard>} />
           <Route path="/cases/:caseId" element={<AuthGuard allowedRoles={["employee"]}><CaseDetail /></AuthGuard>} />
           <Route path="/cases/:caseId/:tab" element={<AuthGuard allowedRoles={["employee"]}><CaseDetail /></AuthGuard>} />
