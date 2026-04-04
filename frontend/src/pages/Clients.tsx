@@ -8,9 +8,9 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { cases } from "@/data/mockData";
 import { formatDate, daysUntil } from "@/lib/formatters";
-import { FILE_STATUSES } from "@/lib/constants";
+import { FILE_STATUSES, CASE_TYPES } from "@/lib/constants";
 import { Link } from "react-router-dom";
-import { Plus, Eye, Pencil } from "lucide-react";
+import { Plus, Eye, Pencil, Phone } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 const statusColor: Record<string, string> = {
@@ -24,16 +24,25 @@ const statusColor: Record<string, string> = {
   Arbitration: "bg-destructive text-destructive-foreground",
 };
 
+const caseTypeShort: Record<string, string> = {
+  "Motor Vehicle Accident (MVA)": "MVA",
+  "Slip and Fall": "Slip & Fall",
+  "Traffic Accident": "Traffic",
+  "Immigration": "Immigration",
+};
+
 export default function Clients() {
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
+  const [caseTypeFilter, setCaseTypeFilter] = useState("all");
   const [page, setPage] = useState(1);
   const perPage = 10;
 
   const filtered = cases.filter((c) => {
     const matchSearch = search === "" || `${c.client.firstName} ${c.client.lastName} ${c.fileNo}`.toLowerCase().includes(search.toLowerCase());
     const matchStatus = statusFilter === "all" || c.fileStatus === statusFilter;
-    return matchSearch && matchStatus;
+    const matchType = caseTypeFilter === "all" || c.caseType === caseTypeFilter;
+    return matchSearch && matchStatus && matchType;
   });
 
   const totalPages = Math.ceil(filtered.length / perPage);
@@ -42,13 +51,20 @@ export default function Clients() {
   return (
     <AppLayout title="Clients">
       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 mb-4">
-        <div className="flex items-center gap-3 flex-1">
+        <div className="flex items-center gap-3 flex-1 flex-wrap">
           <Input placeholder="Search clients or file no..." value={search} onChange={(e) => { setSearch(e.target.value); setPage(1); }} className="max-w-xs h-9 text-sm" />
           <Select value={statusFilter} onValueChange={(v) => { setStatusFilter(v); setPage(1); }}>
             <SelectTrigger className="w-36 h-9 text-sm"><SelectValue placeholder="All Statuses" /></SelectTrigger>
             <SelectContent>
               <SelectItem value="all">All Statuses</SelectItem>
               {FILE_STATUSES.map((s) => <SelectItem key={s} value={s}>{s}</SelectItem>)}
+            </SelectContent>
+          </Select>
+          <Select value={caseTypeFilter} onValueChange={(v) => { setCaseTypeFilter(v); setPage(1); }}>
+            <SelectTrigger className="w-44 h-9 text-sm"><SelectValue placeholder="All Case Types" /></SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All Case Types</SelectItem>
+              {CASE_TYPES.map((t) => <SelectItem key={t} value={t}>{t}</SelectItem>)}
             </SelectContent>
           </Select>
         </div>
@@ -64,6 +80,8 @@ export default function Clients() {
               <TableRow>
                 <TableHead className="text-xs">File No</TableHead>
                 <TableHead className="text-xs">Client Name</TableHead>
+                <TableHead className="text-xs">Phone</TableHead>
+                <TableHead className="text-xs">Case Type</TableHead>
                 <TableHead className="text-xs">Date of Loss</TableHead>
                 <TableHead className="text-xs">Status</TableHead>
                 <TableHead className="text-xs">Clerk Assigned</TableHead>
@@ -75,13 +93,24 @@ export default function Clients() {
               {paginated.map((c) => {
                 const limDays = daysUntil(c.limitationDate);
                 return (
-                  <TableRow key={c.id} className="text-sm cursor-pointer hover:bg-muted/50" onClick={() => {}}>
+                  <TableRow key={c.id} className="text-sm cursor-pointer hover:bg-muted/50">
                     <TableCell className="py-2 font-medium">{c.fileNo}</TableCell>
                     <TableCell className="py-2">{c.client.firstName} {c.client.lastName}</TableCell>
+                    <TableCell className="py-2">
+                      {c.client.phoneNumber ? (
+                        <a href={`tel:${c.client.phoneNumber}`} className="flex items-center gap-1 text-primary hover:underline">
+                          <Phone className="h-3 w-3" />
+                          <span className="text-xs">{c.client.phoneNumber}</span>
+                        </a>
+                      ) : <span className="text-muted-foreground text-xs">—</span>}
+                    </TableCell>
+                    <TableCell className="py-2">
+                      <Badge variant="outline" className="text-xs">{caseTypeShort[c.caseType] || c.caseType}</Badge>
+                    </TableCell>
                     <TableCell className="py-2">{formatDate(c.dateOfLoss)}</TableCell>
                     <TableCell className="py-2"><Badge className={cn("text-xs", statusColor[c.fileStatus])}>{c.fileStatus}</Badge></TableCell>
                     <TableCell className="py-2">{c.clerkAssigned}</TableCell>
-                    <TableCell className={cn("py-2", limDays <= 7 && limDays >= 0 ? "text-destructive font-semibold" : "")}>{formatDate(c.limitationDate)}</TableCell>
+                    <TableCell className={cn("py-2", limDays <= 7 && limDays >= 0 ? "text-destructive font-semibold" : limDays <= 30 && limDays > 7 ? "text-orange-500" : "")}>{formatDate(c.limitationDate)}</TableCell>
                     <TableCell className="py-2">
                       <div className="flex gap-1">
                         <Button variant="ghost" size="icon" asChild className="h-7 w-7"><Link to={`/cases/${c.id}`}><Eye className="h-3.5 w-3.5" /></Link></Button>
