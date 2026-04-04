@@ -14,6 +14,8 @@ export interface Client {
   dateOfBirth: string;
   maritalStatus: string;
   dependants: number;
+  phoneNumber?: string;
+  mobileNumber?: string;
 }
 
 export interface CaseRecord {
@@ -21,6 +23,7 @@ export interface CaseRecord {
   clientId: string;
   fileNo: string;
   fileStatus: string;
+  caseType: string;
   dateOfLoss: string;
   openDate: string;
   referredBy: string;
@@ -37,7 +40,6 @@ export interface CaseRecord {
   tortFileNo: string;
   closedFileNo: string;
   client: Client;
-  // New fields
   clientSignatureUrl?: string;
   clientInitials?: string;
   clientStreet?: string;
@@ -45,6 +47,7 @@ export interface CaseRecord {
   clientState?: string;
   clientZip?: string;
   clientCountry?: string;
+  clientMobile?: string;
 }
 
 export interface Referrer {
@@ -128,19 +131,19 @@ export const referrers: Referrer[] = [
 ];
 
 const clients: Client[] = [
-  { id: "c1", firstName: "James", lastName: "Morrison", initial: "R", address: "142 Queen Street West", city: "Toronto", province: "Ontario", postCode: "M5H 2N5", homePhone: "4165551234", cellPhone: "4165559876", workPhone: "4165554321", email: "james.morrison@email.com", dateOfBirth: "1985-03-15", maritalStatus: "Married", dependants: 2 },
-  { id: "c2", firstName: "Sarah", lastName: "Chen", initial: "L", address: "88 Yonge Street", city: "Toronto", province: "Ontario", postCode: "M5C 1T4", homePhone: "4165552345", cellPhone: "4165558765", workPhone: "", email: "sarah.chen@email.com", dateOfBirth: "1990-07-22", maritalStatus: "Single", dependants: 0 },
-  { id: "c3", firstName: "Michael", lastName: "Patel", initial: "K", address: "305 Dundas Street", city: "Mississauga", province: "Ontario", postCode: "L5B 1H3", homePhone: "9055553456", cellPhone: "9055557654", workPhone: "9055556789", email: "m.patel@email.com", dateOfBirth: "1978-11-08", maritalStatus: "Married", dependants: 3 },
-  { id: "c4", firstName: "Emily", lastName: "Rodriguez", initial: "A", address: "72 King Street", city: "Hamilton", province: "Ontario", postCode: "L8P 4V2", homePhone: "9055554567", cellPhone: "9055556543", workPhone: "", email: "emily.rod@email.com", dateOfBirth: "1995-01-30", maritalStatus: "Common-Law", dependants: 1 },
-  { id: "c5", firstName: "David", lastName: "Thompson", initial: "W", address: "1200 Bay Street", city: "Toronto", province: "Ontario", postCode: "M5R 2A5", homePhone: "4165555678", cellPhone: "4165555432", workPhone: "4165559012", email: "d.thompson@email.com", dateOfBirth: "1982-06-14", maritalStatus: "Divorced", dependants: 1 },
+  { id: "c1", firstName: "James", lastName: "Morrison", initial: "R", address: "142 Queen Street West", city: "Toronto", province: "Ontario", postCode: "M5H 2N5", homePhone: "4165551234", cellPhone: "4165559876", workPhone: "4165554321", email: "james.morrison@email.com", dateOfBirth: "1985-03-15", maritalStatus: "Married", dependants: 2, phoneNumber: "+1-416-555-1234", mobileNumber: "+14165559876" },
+  { id: "c2", firstName: "Sarah", lastName: "Chen", initial: "L", address: "88 Yonge Street", city: "Toronto", province: "Ontario", postCode: "M5C 1T4", homePhone: "4165552345", cellPhone: "4165558765", workPhone: "", email: "sarah.chen@email.com", dateOfBirth: "1990-07-22", maritalStatus: "Single", dependants: 0, phoneNumber: "+1-416-555-2345", mobileNumber: "+14165558765" },
+  { id: "c3", firstName: "Michael", lastName: "Patel", initial: "K", address: "305 Dundas Street", city: "Mississauga", province: "Ontario", postCode: "L5B 1H3", homePhone: "9055553456", cellPhone: "9055557654", workPhone: "9055556789", email: "m.patel@email.com", dateOfBirth: "1978-11-08", maritalStatus: "Married", dependants: 3, phoneNumber: "+1-905-555-3456", mobileNumber: "+19055557654" },
+  { id: "c4", firstName: "Emily", lastName: "Rodriguez", initial: "A", address: "72 King Street", city: "Hamilton", province: "Ontario", postCode: "L8P 4V2", homePhone: "9055554567", cellPhone: "9055556543", workPhone: "", email: "emily.rod@email.com", dateOfBirth: "1995-01-30", maritalStatus: "Common-Law", dependants: 1, phoneNumber: "+1-905-555-4567", mobileNumber: "+19055556543" },
+  { id: "c5", firstName: "David", lastName: "Thompson", initial: "W", address: "1200 Bay Street", city: "Toronto", province: "Ontario", postCode: "M5R 2A5", homePhone: "4165555678", cellPhone: "4165555432", workPhone: "4165559012", email: "d.thompson@email.com", dateOfBirth: "1982-06-14", maritalStatus: "Divorced", dependants: 1, phoneNumber: "+1-416-555-5678", mobileNumber: "+14165555432" },
 ];
 
 export const cases: CaseRecord[] = [
-  { id: "1", clientId: "c1", fileNo: "MVA-2024-1001", fileStatus: "Active", dateOfLoss: "2024-06-15", openDate: "2024-06-20", referredBy: "Dr. Williams", referredById: "r1", clerkAssigned: "Amanda Singh", secretary: "Lisa Park", limitationDate: "2026-06-15", mediationStatus: "Pending", arbitrationStatus: "N/A", mvaClientFault: "No", benefitsClaiming: "Yes", irbNonEarnerDue: "Yes", thirdPartyLawyer: "Robert Lee", tortFileNo: "TORT-2024-501", closedFileNo: "", client: clients[0], clientInitials: "JM", clientStreet: "142 Queen Street West", clientCity: "Toronto", clientState: "Ontario", clientZip: "M5H 2N5", clientCountry: "Canada" },
-  { id: "2", clientId: "c2", fileNo: "MVA-2024-1002", fileStatus: "Active", dateOfLoss: "2024-08-03", openDate: "2024-08-10", referredBy: "Walk-in", referredById: "r3", clerkAssigned: "John Baker", secretary: "Lisa Park", limitationDate: "2026-04-01", mediationStatus: "N/A", arbitrationStatus: "N/A", mvaClientFault: "No", benefitsClaiming: "Yes", irbNonEarnerDue: "No", thirdPartyLawyer: "Karen White", tortFileNo: "TORT-2024-502", closedFileNo: "", client: clients[1], clientInitials: "SC", clientStreet: "88 Yonge Street", clientCity: "Toronto", clientState: "Ontario", clientZip: "M5C 1T4", clientCountry: "Canada" },
-  { id: "3", clientId: "c3", fileNo: "MVA-2023-0987", fileStatus: "Litigation", dateOfLoss: "2023-02-14", openDate: "2023-02-28", referredBy: "Ahmed & Partners", referredById: "r2", clerkAssigned: "Amanda Singh", secretary: "Maria Costa", limitationDate: "2025-02-14", mediationStatus: "Completed", arbitrationStatus: "Scheduled", mvaClientFault: "No", benefitsClaiming: "Yes", irbNonEarnerDue: "Yes", thirdPartyLawyer: "Steven Grant", tortFileNo: "TORT-2023-320", closedFileNo: "", client: clients[2], clientInitials: "MP", clientStreet: "305 Dundas Street", clientCity: "Mississauga", clientState: "Ontario", clientZip: "L5B 1H3", clientCountry: "Canada" },
-  { id: "4", clientId: "c4", fileNo: "MVA-2024-1045", fileStatus: "Pending", dateOfLoss: "2024-11-20", openDate: "2024-11-25", referredBy: "Google Search", referredById: "r4", clerkAssigned: "John Baker", secretary: "Maria Costa", limitationDate: "2026-03-25", mediationStatus: "N/A", arbitrationStatus: "N/A", mvaClientFault: "Yes", benefitsClaiming: "No", irbNonEarnerDue: "No", thirdPartyLawyer: "", tortFileNo: "", closedFileNo: "", client: clients[3], clientInitials: "ER", clientStreet: "72 King Street", clientCity: "Hamilton", clientState: "Ontario", clientZip: "L8P 4V2", clientCountry: "Canada" },
-  { id: "5", clientId: "c5", fileNo: "MVA-2023-0845", fileStatus: "Settled", dateOfLoss: "2023-05-10", openDate: "2023-05-15", referredBy: "Client Referral", referredById: "r5", clerkAssigned: "Amanda Singh", secretary: "Lisa Park", limitationDate: "2025-05-10", mediationStatus: "Completed", arbitrationStatus: "N/A", mvaClientFault: "No", benefitsClaiming: "Yes", irbNonEarnerDue: "Yes", thirdPartyLawyer: "Jennifer Adams", tortFileNo: "TORT-2023-290", closedFileNo: "CLO-2025-112", client: clients[4], clientInitials: "DT", clientStreet: "1200 Bay Street", clientCity: "Toronto", clientState: "Ontario", clientZip: "M5R 2A5", clientCountry: "Canada" },
+  { id: "1", clientId: "c1", fileNo: "MVA-2024-1001", fileStatus: "Active", caseType: "Motor Vehicle Accident (MVA)", dateOfLoss: "2024-06-15", openDate: "2024-06-20", referredBy: "Dr. Williams", referredById: "r1", clerkAssigned: "Amanda Singh", secretary: "Lisa Park", limitationDate: "2026-06-15", mediationStatus: "Pending", arbitrationStatus: "N/A", mvaClientFault: "No", benefitsClaiming: "Yes", irbNonEarnerDue: "Yes", thirdPartyLawyer: "Robert Lee", tortFileNo: "TORT-2024-501", closedFileNo: "", client: clients[0], clientInitials: "JM", clientStreet: "142 Queen Street West", clientCity: "Toronto", clientState: "Ontario", clientZip: "M5H 2N5", clientCountry: "Canada", clientMobile: "+14165559876" },
+  { id: "2", clientId: "c2", fileNo: "MVA-2024-1002", fileStatus: "Active", caseType: "Motor Vehicle Accident (MVA)", dateOfLoss: "2024-08-03", openDate: "2024-08-10", referredBy: "Walk-in", referredById: "r3", clerkAssigned: "John Baker", secretary: "Lisa Park", limitationDate: "2026-04-01", mediationStatus: "N/A", arbitrationStatus: "N/A", mvaClientFault: "No", benefitsClaiming: "Yes", irbNonEarnerDue: "No", thirdPartyLawyer: "Karen White", tortFileNo: "TORT-2024-502", closedFileNo: "", client: clients[1], clientInitials: "SC", clientStreet: "88 Yonge Street", clientCity: "Toronto", clientState: "Ontario", clientZip: "M5C 1T4", clientCountry: "Canada", clientMobile: "+14165558765" },
+  { id: "3", clientId: "c3", fileNo: "MVA-2023-0987", fileStatus: "Litigation", caseType: "Slip and Fall", dateOfLoss: "2023-02-14", openDate: "2023-02-28", referredBy: "Ahmed & Partners", referredById: "r2", clerkAssigned: "Amanda Singh", secretary: "Maria Costa", limitationDate: "2025-02-14", mediationStatus: "Completed", arbitrationStatus: "Scheduled", mvaClientFault: "No", benefitsClaiming: "Yes", irbNonEarnerDue: "Yes", thirdPartyLawyer: "Steven Grant", tortFileNo: "TORT-2023-320", closedFileNo: "", client: clients[2], clientInitials: "MP", clientStreet: "305 Dundas Street", clientCity: "Mississauga", clientState: "Ontario", clientZip: "L5B 1H3", clientCountry: "Canada", clientMobile: "+19055557654" },
+  { id: "4", clientId: "c4", fileNo: "MVA-2024-1045", fileStatus: "Pending", caseType: "Traffic Accident", dateOfLoss: "2024-11-20", openDate: "2024-11-25", referredBy: "Google Search", referredById: "r4", clerkAssigned: "John Baker", secretary: "Maria Costa", limitationDate: "2026-03-25", mediationStatus: "N/A", arbitrationStatus: "N/A", mvaClientFault: "Yes", benefitsClaiming: "No", irbNonEarnerDue: "No", thirdPartyLawyer: "", tortFileNo: "", closedFileNo: "", client: clients[3], clientInitials: "ER", clientStreet: "72 King Street", clientCity: "Hamilton", clientState: "Ontario", clientZip: "L8P 4V2", clientCountry: "Canada", clientMobile: "+19055556543" },
+  { id: "5", clientId: "c5", fileNo: "MVA-2023-0845", fileStatus: "Settled", caseType: "Immigration", dateOfLoss: "2023-05-10", openDate: "2023-05-15", referredBy: "Client Referral", referredById: "r5", clerkAssigned: "Amanda Singh", secretary: "Lisa Park", limitationDate: "2025-05-10", mediationStatus: "Completed", arbitrationStatus: "N/A", mvaClientFault: "No", benefitsClaiming: "Yes", irbNonEarnerDue: "Yes", thirdPartyLawyer: "Jennifer Adams", tortFileNo: "TORT-2023-290", closedFileNo: "CLO-2025-112", client: clients[4], clientInitials: "DT", clientStreet: "1200 Bay Street", clientCity: "Toronto", clientState: "Ontario", clientZip: "M5R 2A5", clientCountry: "Canada", clientMobile: "+14165555432" },
 ];
 
 export const notes: Note[] = [
