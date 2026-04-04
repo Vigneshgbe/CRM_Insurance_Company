@@ -9,11 +9,11 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { getCaseById, referrers } from "@/data/mockData";
-import { formatDate, daysUntil } from "@/lib/formatters";
-import { FILE_STATUSES, PROVINCES } from "@/lib/constants";
+import { formatDate, daysUntil, formatMobileNumber, getMobileTelUri, validateMobileNumber } from "@/lib/formatters";
+import { FILE_STATUSES, PROVINCES, CASE_TYPES } from "@/lib/constants";
 import { cn } from "@/lib/utils";
 import { useToast } from "@/hooks/use-toast";
-import { Pencil, X, Save, Upload } from "lucide-react";
+import { Pencil, X, Save, Upload, Phone } from "lucide-react";
 import SignaturePad from "@/components/SignaturePad";
 import NotesTab from "@/components/case-tabs/NotesTab";
 import DocumentsTab from "@/components/case-tabs/DocumentsTab";
@@ -92,6 +92,7 @@ export default function CaseDetail() {
   const [saving, setSaving] = useState(false);
   const [signatureUrl, setSignatureUrl] = useState(caseData?.clientSignatureUrl || "");
   const [referrerSearch, setReferrerSearch] = useState("");
+  const [mobileError, setMobileError] = useState("");
 
   const { register, handleSubmit, control, reset } = useForm({
     defaultValues: {
@@ -116,6 +117,7 @@ export default function CaseDetail() {
       clientState: caseData?.clientState || "",
       clientZip: caseData?.clientZip || "",
       clientCountry: caseData?.clientCountry || "Canada",
+      clientMobile: caseData?.clientMobile || "",
     },
   });
 
@@ -182,6 +184,15 @@ export default function CaseDetail() {
                 {caseData.clientStreet && (
                   <p className="text-xs text-muted-foreground mt-1">
                     Address: {caseData.clientStreet}, {caseData.clientCity}, {caseData.clientState} {caseData.clientZip}, {caseData.clientCountry}
+                  </p>
+                )}
+                {caseData.clientMobile && (
+                  <p className="text-xs text-muted-foreground mt-1 flex items-center gap-1">
+                    <Phone className="h-3 w-3" />
+                    <span>Mobile:</span>
+                    <a href={getMobileTelUri(caseData.clientMobile)} className="hover:underline text-foreground">
+                      {formatMobileNumber(caseData.clientMobile)}
+                    </a>
                   </p>
                 )}
               </div>
@@ -295,6 +306,24 @@ export default function CaseDetail() {
                 </div>
                 <div><Label className="text-xs">ZIP/Postal Code</Label><Input {...register("clientZip")} className="h-8 text-xs mt-1" /></div>
                 <div><Label className="text-xs">Country</Label><Input {...register("clientCountry")} className="h-8 text-xs mt-1" /></div>
+                <div>
+                  <Label className="text-xs">Mobile Number</Label>
+                  <div className="flex items-center gap-1 mt-1">
+                    <Phone className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
+                    <Input
+                      {...register("clientMobile", {
+                        validate: (v) => validateMobileNumber(v || ""),
+                        onChange: (e) => {
+                          const result = validateMobileNumber(e.target.value);
+                          setMobileError(result === true ? "" : result);
+                        }
+                      })}
+                      placeholder="+1-XXX-XXX-XXXX"
+                      className="h-8 text-xs"
+                    />
+                  </div>
+                  {mobileError && <p className="text-xs text-destructive mt-1">{mobileError}</p>}
+                </div>
               </div>
 
               {/* Section: Client Initials */}
