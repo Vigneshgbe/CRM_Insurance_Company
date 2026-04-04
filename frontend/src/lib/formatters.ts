@@ -37,3 +37,30 @@ export function generateFileNo(): string {
   const seq = Math.floor(Math.random() * 9000) + 1000;
   return `MVA-${year}-${seq}`;
 }
+
+export function formatMobileNumber(mobile: string): string {
+  if (!mobile) return "";
+  const cleaned = mobile.replace(/\D/g, "");
+  if (cleaned.length === 11 && cleaned.startsWith("1")) {
+    return `+1-${cleaned.slice(1, 4)}-${cleaned.slice(4, 7)}-${cleaned.slice(7)}`;
+  }
+  if (cleaned.length === 10) {
+    return `+1-${cleaned.slice(0, 3)}-${cleaned.slice(3, 6)}-${cleaned.slice(6)}`;
+  }
+  return mobile;
+}
+
+export function getMobileTelUri(mobile: string): string {
+  if (!mobile) return "";
+  const cleaned = mobile.replace(/\D/g, "");
+  return `tel:+${cleaned.startsWith("1") ? cleaned : "1" + cleaned}`;
+}
+
+export function validateMobileNumber(value: string): string | true {
+  if (!value || value.trim() === "") return true;
+  const formatted = /^\+1-\d{3}-\d{3}-\d{4}$/.test(value);
+  const parens = /^\(\d{3}\)\s?\d{3}-\d{4}$/.test(value);
+  const plain = /^\+?1?\d{10,11}$/.test(value.replace(/\D/g, ""));
+  if (formatted || parens || plain) return true;
+  return "Format: +1-XXX-XXX-XXXX or (XXX) XXX-XXXX";
+}
