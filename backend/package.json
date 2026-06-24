@@ -4,10 +4,10 @@
   "description": "Hypernova CRM Backend API",
   "main": "dist/server.js",
   "scripts": {
-    "dev": "nodemon --exec ts-node src/server.ts",
+    "dev": "nodemon",
     "build": "tsc",
     "start": "node dist/server.js",
-    "db:migrate": "ts-node src/config/migrate.ts"
+    "start:ts": "ts-node --transpile-only --skip-project src/server.ts"
   },
   "dependencies": {
     "bcryptjs": "^2.4.3",
@@ -17,8 +17,7 @@
     "jsonwebtoken": "^9.0.2",
     "multer": "^1.4.5-lts.1",
     "mysql2": "^3.9.7",
-    "pdf-lib": "^1.17.1",
-    "uuid": "^9.0.1"
+    "pdf-lib": "^1.17.1"
   },
   "devDependencies": {
     "@types/bcryptjs": "^2.4.6",
@@ -27,7 +26,6 @@
     "@types/jsonwebtoken": "^9.0.6",
     "@types/multer": "^1.4.11",
     "@types/node": "^20.12.7",
-    "@types/uuid": "^9.0.8",
     "nodemon": "^3.1.0",
     "ts-node": "^10.9.2",
     "typescript": "^5.4.5"
