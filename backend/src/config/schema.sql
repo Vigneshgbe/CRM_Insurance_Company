@@ -1,14 +1,14 @@
 -- ============================================================
 -- HYPERNOVA CRM — COMPLETE MySQL SCHEMA
--- DB: Padak_insurance_crm
+-- DB: padak_insurance_crm
 -- All tables matching frontend data shapes exactly
 -- ============================================================
 
-CREATE DATABASE IF NOT EXISTS Padak_insurance_crm
+CREATE DATABASE IF NOT EXISTS padak_insurance_crm
   CHARACTER SET utf8mb4
   COLLATE utf8mb4_unicode_ci;
 
-USE Padak_insurance_crm;
+USE padak_insurance_crm;
 
 -- ============================================================
 -- 1. USERS
