@@ -1,75 +1,86 @@
-import { createContext, useContext, useState, useCallback, ReactNode } from "react";
+import { createContext, useContext, useState, useEffect, ReactNode } from "react";
 
-export type UserRole = "employee" | "client";
-
+// ── Types ────────────────────────────────────────────────────
 export interface AuthUser {
   id: string;
   email: string;
   name: string;
-  role: UserRole;
-  clientId?: string; // only for client role
+  role: "employee" | "client";
+  clientId?: string;
 }
 
-interface AuthContextValue {
+interface AuthContextType {
   user: AuthUser | null;
   login: (email: string, password: string) => Promise<boolean>;
   logout: () => void;
 }
 
-const AuthContext = createContext<AuthContextValue>({
-  user: null,
-  login: async () => false,
-  logout: () => {},
-});
+// ── Backend URL ──────────────────────────────────────────────
+// Change this if your backend runs on a different port
+const API_URL = "http://localhost:5000/api";
 
-// Mock users
-const MOCK_USERS: Array<{ email: string; password: string; user: AuthUser }> = [
-  {
-    email: "admin@hypernova.com",
-    password: "password",
-    user: { id: "u1", email: "admin@hypernova.com", name: "Amanda Singh", role: "employee" },
-  },
-  {
-    email: "employee@hypernova.com",
-    password: "password",
-    user: { id: "u2", email: "employee@hypernova.com", name: "John Baker", role: "employee" },
-  },
-  {
-    email: "james.morrison@email.com",
-    password: "password",
-    user: { id: "u3", email: "james.morrison@email.com", name: "James Morrison", role: "client", clientId: "c1" },
-  },
-  {
-    email: "sarah.chen@email.com",
-    password: "password",
-    user: { id: "u4", email: "sarah.chen@email.com", name: "Sarah Chen", role: "client", clientId: "c2" },
-  },
-];
+// ── Context ──────────────────────────────────────────────────
+const AuthContext = createContext<AuthContextType | null>(null);
 
 export function AuthProvider({ children }: { children: ReactNode }) {
-  const [user, setUser] = useState<AuthUser | null>(() => {
+  const [user, setUser] = useState<AuthUser | null>(null);
+
+  // On app load — restore session from sessionStorage
+  useEffect(() => {
     const stored = sessionStorage.getItem("crm_user");
-    return stored ? JSON.parse(stored) : null;
-  });
-
-  const login = useCallback(async (email: string, password: string): Promise<boolean> => {
-    const found = MOCK_USERS.find((u) => u.email === email && u.password === password);
-    if (found) {
-      setUser(found.user);
-      sessionStorage.setItem("crm_user", JSON.stringify(found.user));
-      return true;
+    if (stored) {
+      try {
+        setUser(JSON.parse(stored));
+      } catch {
+        sessionStorage.removeItem("crm_user");
+        sessionStorage.removeItem("crm_token");
+      }
     }
-    return false;
   }, []);
 
-  const logout = useCallback(() => {
-    setUser(null);
+  // ── Login — calls real backend ───────────────────────────
+  async function login(email: string, password: string): Promise<boolean> {
+    try {
+      const response = await fetch(`${API_URL}/auth/login`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email, password }),
+      });
+
+      if (!response.ok) return false;
+
+      const data = await response.json();
+
+      if (!data.token || !data.user) return false;
+
+      // Store token and user in sessionStorage
+      sessionStorage.setItem("crm_token", data.token);
+      sessionStorage.setItem("crm_user", JSON.stringify(data.user));
+      setUser(data.user);
+      return true;
+    } catch (err) {
+      console.error("Login error:", err);
+      return false;
+    }
+  }
+
+  // ── Logout ───────────────────────────────────────────────
+  function logout() {
+    sessionStorage.removeItem("crm_token");
     sessionStorage.removeItem("crm_user");
-  }, []);
+    setUser(null);
+  }
 
-  return <AuthContext.Provider value={{ user, login, logout }}>{children}</AuthContext.Provider>;
+  return (
+    <AuthContext.Provider value={{ user, login, logout }}>
+      {children}
+    </AuthContext.Provider>
+  );
 }
 
-export function useAuth() {
-  return useContext(AuthContext);
+// ── Hook ─────────────────────────────────────────────────────
+export function useAuth(): AuthContextType {
+  const ctx = useContext(AuthContext);
+  if (!ctx) throw new Error("useAuth must be used inside AuthProvider");
+  return ctx;
 }
