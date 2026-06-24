@@ -2,18 +2,16 @@ import { Request, Response } from 'express';
 import multer from 'multer';
 import path from 'path';
 import pool from '../config/database';
-import { formatDate } from '../utils/helpers';
-import crypto from 'crypto';
+import { generateId, formatDate } from '../utils/helpers';
 
-// Multer storage — local uploads folder
+// Multer storage
 const storage = multer.diskStorage({
   destination: (_req, _file, cb) => {
     cb(null, path.join(process.cwd(), 'uploads'));
   },
   filename: (_req, file, cb) => {
     const ext = path.extname(file.originalname);
-    const name = crypto.randomUUID() + ext;
-    cb(null, name);
+    cb(null, generateId() + ext);
   },
 });
 
@@ -36,14 +34,16 @@ function mapDoc(row: any, caseFileNo?: string) {
   };
 }
 
-// GET /api/documents — all docs with case file no joined
 export async function getAllDocuments(req: Request, res: Response): Promise<void> {
   try {
     const { search, category } = req.query;
-    let sql = `SELECT d.*, ca.file_no as case_file_no FROM documents d
-               LEFT JOIN cases ca ON d.case_id = ca.id WHERE 1=1`;
+    let sql = `SELECT d.*, ca.file_no as case_file_no FROM documents d LEFT JOIN cases ca ON d.case_id = ca.id WHERE 1=1`;
     const params: any[] = [];
-    if (search) { sql += ' AND (d.name LIKE ? OR ca.file_no LIKE ?)'; const like = `%${search}%`; params.push(like, like); }
+    if (search) {
+      sql += ' AND (d.name LIKE ? OR ca.file_no LIKE ?)';
+      const like = `%${search}%`;
+      params.push(like, like);
+    }
     if (category) { sql += ' AND d.category = ?'; params.push(category); }
     sql += ' ORDER BY d.created_at DESC';
     const [rows] = await pool.query(sql, params) as any[];
@@ -51,7 +51,6 @@ export async function getAllDocuments(req: Request, res: Response): Promise<void
   } catch (err) { res.status(500).json({ error: 'Server error' }); }
 }
 
-// GET /api/cases/:caseId/documents
 export async function getDocumentsByCase(req: Request, res: Response): Promise<void> {
   try {
     const [rows] = await pool.query(
@@ -61,19 +60,16 @@ export async function getDocumentsByCase(req: Request, res: Response): Promise<v
   } catch (err) { res.status(500).json({ error: 'Server error' }); }
 }
 
-// POST /api/cases/:caseId/documents — file upload
 export async function uploadDocument(req: Request, res: Response): Promise<void> {
   try {
     const caseId = req.params.caseId;
     const file = (req as any).file;
     if (!file) { res.status(400).json({ error: 'No file uploaded' }); return; }
-
     const uploadedBy = (req as any).user?.name || 'System';
     const category = req.body.category || 'Other';
-    const id = crypto.randomUUID();
+    const id = generateId();
     const fileUrl = `/uploads/${file.filename}`;
     const ext = path.extname(file.originalname).replace('.', '').toUpperCase();
-
     await pool.query(
       `INSERT INTO documents (id, case_id, name, type, category, uploaded_by, file_url, file_size, date)
        VALUES (?,?,?,?,?,?,?,?,CURDATE())`,
@@ -84,7 +80,6 @@ export async function uploadDocument(req: Request, res: Response): Promise<void>
   } catch (err) { console.error(err); res.status(500).json({ error: 'Server error' }); }
 }
 
-// PUT /api/documents/:id — rename
 export async function renameDocument(req: Request, res: Response): Promise<void> {
   try {
     const { name } = req.body;
@@ -95,7 +90,6 @@ export async function renameDocument(req: Request, res: Response): Promise<void>
   } catch (err) { res.status(500).json({ error: 'Server error' }); }
 }
 
-// DELETE /api/documents/:id
 export async function deleteDocument(req: Request, res: Response): Promise<void> {
   try {
     await pool.query('DELETE FROM documents WHERE id = ?', [req.params.id]);

@@ -1,8 +1,7 @@
 import { Request, Response } from 'express';
 import pool from '../config/database';
-import { generateFileNo, formatDate } from '../utils/helpers';
+import { generateId, generateFileNo, formatDate } from '../utils/helpers';
 
-// Map DB row → CaseRecord interface shape (matches mockData.ts exactly)
 function mapCase(row: any): any {
   return {
     id: row.id,
@@ -33,11 +32,9 @@ function mapCase(row: any): any {
     clientZip: row.client_zip || '',
     clientCountry: row.client_country || 'Canada',
     clientMobile: row.client_mobile || '',
-    // Extra fields
     abCounsel: row.ab_counsel || '',
     tortLawFirm: row.tort_law_firm || '',
     tortCounsel: row.tort_counsel || '',
-    // Nested client object
     client: {
       id: row.c_id || row.client_id,
       firstName: row.c_first_name || '',
@@ -75,10 +72,9 @@ const CASE_JOIN = `
 
 export async function getCases(req: Request, res: Response): Promise<void> {
   try {
-    const { search, status, caseType } = req.query;
+    const { search, status, caseType, assignedTo, dateFrom, dateTo } = req.query;
     let sql = CASE_JOIN + ' WHERE 1=1';
     const params: any[] = [];
-
     if (search) {
       sql += ' AND (ca.file_no LIKE ? OR cl.first_name LIKE ? OR cl.last_name LIKE ?)';
       const like = `%${search}%`;
@@ -86,14 +82,13 @@ export async function getCases(req: Request, res: Response): Promise<void> {
     }
     if (status) { sql += ' AND ca.file_status = ?'; params.push(status); }
     if (caseType) { sql += ' AND ca.case_type = ?'; params.push(caseType); }
+    if (assignedTo) { sql += ' AND ca.clerk_assigned = ?'; params.push(assignedTo); }
+    if (dateFrom) { sql += ' AND ca.date_of_loss >= ?'; params.push(dateFrom); }
+    if (dateTo) { sql += ' AND ca.date_of_loss <= ?'; params.push(dateTo); }
     sql += ' ORDER BY ca.created_at DESC';
-
     const [rows] = await pool.query(sql, params) as any[];
     res.json((rows as any[]).map(mapCase));
-  } catch (err) {
-    console.error(err);
-    res.status(500).json({ error: 'Server error' });
-  }
+  } catch (err) { console.error(err); res.status(500).json({ error: 'Server error' }); }
 }
 
 export async function getCaseById(req: Request, res: Response): Promise<void> {
@@ -101,9 +96,7 @@ export async function getCaseById(req: Request, res: Response): Promise<void> {
     const [rows] = await pool.query(CASE_JOIN + ' WHERE ca.id = ?', [req.params.id]) as any[];
     if (!(rows as any[])[0]) { res.status(404).json({ error: 'Case not found' }); return; }
     res.json(mapCase((rows as any[])[0]));
-  } catch (err) {
-    res.status(500).json({ error: 'Server error' });
-  }
+  } catch (err) { res.status(500).json({ error: 'Server error' }); }
 }
 
 export async function getCaseByFileNo(req: Request, res: Response): Promise<void> {
@@ -111,9 +104,7 @@ export async function getCaseByFileNo(req: Request, res: Response): Promise<void
     const [rows] = await pool.query(CASE_JOIN + ' WHERE ca.file_no = ?', [req.params.fileNo]) as any[];
     if (!(rows as any[])[0]) { res.status(404).json({ error: 'Case not found' }); return; }
     res.json(mapCase((rows as any[])[0]));
-  } catch (err) {
-    res.status(500).json({ error: 'Server error' });
-  }
+  } catch (err) { res.status(500).json({ error: 'Server error' }); }
 }
 
 export async function createCase(req: Request, res: Response): Promise<void> {
@@ -127,17 +118,18 @@ export async function createCase(req: Request, res: Response): Promise<void> {
   } = req.body;
 
   if (!clientId || !caseType) {
-    res.status(400).json({ error: 'clientId and caseType are required' });
-    return;
+    res.status(400).json({ error: 'clientId and caseType required' }); return;
   }
 
   try {
-    // Generate next file number
-    const [seqRows] = await pool.query("SELECT COUNT(*) as cnt FROM cases WHERE file_no LIKE ?", [`MVA-${new Date().getFullYear()}-%`]) as any[];
+    const [seqRows] = await pool.query(
+      `SELECT COUNT(*) as cnt FROM cases WHERE file_no LIKE ?`,
+      [`MVA-${new Date().getFullYear()}-%`]
+    ) as any[];
     const lastSeq = (seqRows as any[])[0].cnt || 0;
     const fileNo = generateFileNo(lastSeq);
+    const id = generateId();
 
-    const id = require('crypto').randomUUID();
     await pool.query(
       `INSERT INTO cases (id, client_id, file_no, file_status, case_type, date_of_loss, open_date,
         referred_by, referred_by_id, clerk_assigned, secretary, limitation_date,
@@ -147,40 +139,30 @@ export async function createCase(req: Request, res: Response): Promise<void> {
         ab_counsel, tort_law_firm, tort_counsel, interviewed_by, interviewed_on,
         conflict_checked, conflict_find, whose_fault, file_status_date)
        VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
-      [
-        id, clientId, fileNo, fileStatus || 'Active', caseType,
-        dateOfLoss || null, openDate || null, referredBy || '', referredById || null,
-        clerkAssigned || '', secretary || '', limitationDate || null,
-        mediationStatus || 'N/A', arbitrationStatus || 'N/A',
-        mvaClientFault || 'No', benefitsClaiming || 'No', irbNonEarnerDue || 'No',
-        thirdPartyLawyer || '', tortFileNo || '', clientInitials || '',
-        clientStreet || '', clientCity || '', clientState || '', clientZip || '',
-        clientCountry || 'Canada', clientMobile || '',
-        abCounsel || '', tortLawFirm || '', tortCounsel || '',
-        interviewedBy || '', interviewedOn || null,
-        conflictChecked ? 1 : 0, conflictFind ? 1 : 0, whoseFault || '', fileStatusDate || null,
-      ]
+      [id, clientId, fileNo, fileStatus||'Active', caseType, dateOfLoss||null, openDate||null,
+       referredBy||'', referredById||null, clerkAssigned||'', secretary||'', limitationDate||null,
+       mediationStatus||'N/A', arbitrationStatus||'N/A', mvaClientFault||'No',
+       benefitsClaiming||'No', irbNonEarnerDue||'No', thirdPartyLawyer||'', tortFileNo||'',
+       clientInitials||'', clientStreet||'', clientCity||'', clientState||'', clientZip||'',
+       clientCountry||'Canada', clientMobile||'', abCounsel||'', tortLawFirm||'', tortCounsel||'',
+       interviewedBy||'', interviewedOn||null,
+       conflictChecked ? 1 : 0, conflictFind ? 1 : 0, whoseFault||'', fileStatusDate||null]
     );
 
-    // Log history
+    const user = (req as any).user?.name || 'System';
     await pool.query(
       `INSERT INTO case_history (id, case_id, date, time, user, action, field_changed, old_value, new_value)
-       VALUES (UUID(), ?, CURDATE(), TIME(NOW()), ?, 'Created', 'Case', '', ?)`,
-      [id, clerkAssigned || 'System', fileNo]
+       VALUES (?,?,CURDATE(),TIME(NOW()),?,'Created','Case','',?)`,
+      [generateId(), id, user, fileNo]
     );
-
-    // Log initial status
     await pool.query(
-      `INSERT INTO status_history (id, case_id, status, date, changed_by) VALUES (UUID(), ?, ?, CURDATE(), ?)`,
-      [id, fileStatus || 'Active', clerkAssigned || 'System']
+      `INSERT INTO status_history (id, case_id, status, date, changed_by) VALUES (?,?,?,CURDATE(),?)`,
+      [generateId(), id, fileStatus||'Active', user]
     );
 
     const [rows] = await pool.query(CASE_JOIN + ' WHERE ca.id = ?', [id]) as any[];
     res.status(201).json(mapCase((rows as any[])[0]));
-  } catch (err) {
-    console.error(err);
-    res.status(500).json({ error: 'Server error' });
-  }
+  } catch (err) { console.error(err); res.status(500).json({ error: 'Server error' }); }
 }
 
 export async function updateCase(req: Request, res: Response): Promise<void> {
@@ -190,12 +172,9 @@ export async function updateCase(req: Request, res: Response): Promise<void> {
     clerkAssigned, secretary, limitationDate, mediationStatus, arbitrationStatus,
     mvaClientFault, benefitsClaiming, irbNonEarnerDue, thirdPartyLawyer, tortFileNo,
     closedFileNo, clientInitials, clientSignatureUrl, clientStreet, clientCity,
-    clientState, clientZip, clientCountry, clientMobile,
-    abCounsel, tortLawFirm, tortCounsel,
+    clientState, clientZip, clientCountry, clientMobile, abCounsel, tortLawFirm, tortCounsel,
   } = req.body;
-
   try {
-    // Track status change for history
     const [oldRows] = await pool.query('SELECT file_status FROM cases WHERE id = ?', [caseId]) as any[];
     const oldStatus = (oldRows as any[])[0]?.file_status;
 
@@ -208,47 +187,35 @@ export async function updateCase(req: Request, res: Response): Promise<void> {
         client_state=?, client_zip=?, client_country=?, client_mobile=?,
         ab_counsel=?, tort_law_firm=?, tort_counsel=?
        WHERE id=?`,
-      [
-        fileStatus, caseType, dateOfLoss || null, openDate || null,
-        referredBy || '', referredById || null, clerkAssigned || '', secretary || '',
-        limitationDate || null, mediationStatus || 'N/A', arbitrationStatus || 'N/A',
-        mvaClientFault || 'No', benefitsClaiming || 'No', irbNonEarnerDue || 'No',
-        thirdPartyLawyer || '', tortFileNo || '', closedFileNo || '',
-        clientInitials || '', clientSignatureUrl || '', clientStreet || '',
-        clientCity || '', clientState || '', clientZip || '',
-        clientCountry || 'Canada', clientMobile || '',
-        abCounsel || '', tortLawFirm || '', tortCounsel || '',
-        caseId,
-      ]
+      [fileStatus, caseType, dateOfLoss||null, openDate||null, referredBy||'', referredById||null,
+       clerkAssigned||'', secretary||'', limitationDate||null, mediationStatus||'N/A',
+       arbitrationStatus||'N/A', mvaClientFault||'No', benefitsClaiming||'No', irbNonEarnerDue||'No',
+       thirdPartyLawyer||'', tortFileNo||'', closedFileNo||'', clientInitials||'',
+       clientSignatureUrl||'', clientStreet||'', clientCity||'', clientState||'', clientZip||'',
+       clientCountry||'Canada', clientMobile||'', abCounsel||'', tortLawFirm||'', tortCounsel||'', caseId]
     );
 
-    // Log status change to history
     if (oldStatus && oldStatus !== fileStatus) {
       const user = (req as any).user?.name || 'System';
       await pool.query(
         `INSERT INTO case_history (id, case_id, date, time, user, action, field_changed, old_value, new_value)
-         VALUES (UUID(), ?, CURDATE(), TIME(NOW()), ?, 'Updated', 'File Status', ?, ?)`,
-        [caseId, user, oldStatus, fileStatus]
+         VALUES (?,?,CURDATE(),TIME(NOW()),?,'Updated','File Status',?,?)`,
+        [generateId(), caseId, user, oldStatus, fileStatus]
       );
       await pool.query(
-        `INSERT INTO status_history (id, case_id, status, date, changed_by) VALUES (UUID(), ?, ?, CURDATE(), ?)`,
-        [caseId, fileStatus, user]
+        `INSERT INTO status_history (id, case_id, status, date, changed_by) VALUES (?,?,?,CURDATE(),?)`,
+        [generateId(), caseId, fileStatus, user]
       );
     }
 
     const [rows] = await pool.query(CASE_JOIN + ' WHERE ca.id = ?', [caseId]) as any[];
     res.json(mapCase((rows as any[])[0]));
-  } catch (err) {
-    console.error(err);
-    res.status(500).json({ error: 'Server error' });
-  }
+  } catch (err) { console.error(err); res.status(500).json({ error: 'Server error' }); }
 }
 
 export async function deleteCase(req: Request, res: Response): Promise<void> {
   try {
     await pool.query('DELETE FROM cases WHERE id = ?', [req.params.id]);
     res.json({ success: true });
-  } catch (err) {
-    res.status(500).json({ error: 'Server error' });
-  }
+  } catch (err) { res.status(500).json({ error: 'Server error' }); }
 }
