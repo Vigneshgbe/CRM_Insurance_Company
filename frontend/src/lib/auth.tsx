@@ -16,8 +16,36 @@ interface AuthContextType {
 }
 
 // ── Backend URL ──────────────────────────────────────────────
-// Change this if your backend runs on a different port
 const API_URL = "http://localhost:5000/api";
+
+// ── Storage helpers — use localStorage so session survives refresh ──
+function saveAuth(token: string, user: AuthUser) {
+  localStorage.setItem("crm_token", token);
+  localStorage.setItem("crm_user", JSON.stringify(user));
+}
+
+function clearAuth() {
+  localStorage.removeItem("crm_token");
+  localStorage.removeItem("crm_user");
+  // Also clear legacy sessionStorage keys in case old data is there
+  sessionStorage.removeItem("crm_token");
+  sessionStorage.removeItem("crm_user");
+}
+
+function loadStoredUser(): AuthUser | null {
+  // Try localStorage first (new), fall back to sessionStorage (old)
+  const stored = localStorage.getItem("crm_user") || sessionStorage.getItem("crm_user");
+  if (!stored) return null;
+  try {
+    return JSON.parse(stored);
+  } catch {
+    return null;
+  }
+}
+
+export function getToken(): string {
+  return localStorage.getItem("crm_token") || sessionStorage.getItem("crm_token") || "";
+}
 
 // ── Context ──────────────────────────────────────────────────
 const AuthContext = createContext<AuthContextType | null>(null);
@@ -25,20 +53,15 @@ const AuthContext = createContext<AuthContextType | null>(null);
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<AuthUser | null>(null);
 
-  // On app load — restore session from sessionStorage
+  // On app load — restore user from localStorage
   useEffect(() => {
-    const stored = sessionStorage.getItem("crm_user");
-    if (stored) {
-      try {
-        setUser(JSON.parse(stored));
-      } catch {
-        sessionStorage.removeItem("crm_user");
-        sessionStorage.removeItem("crm_token");
-      }
+    const storedUser = loadStoredUser();
+    if (storedUser) {
+      setUser(storedUser);
     }
   }, []);
 
-  // ── Login — calls real backend ───────────────────────────
+  // ── Login ────────────────────────────────────────────────
   async function login(email: string, password: string): Promise<boolean> {
     try {
       const response = await fetch(`${API_URL}/auth/login`, {
@@ -50,12 +73,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       if (!response.ok) return false;
 
       const data = await response.json();
-
       if (!data.token || !data.user) return false;
 
-      // Store token and user in sessionStorage
-      sessionStorage.setItem("crm_token", data.token);
-      sessionStorage.setItem("crm_user", JSON.stringify(data.user));
+      saveAuth(data.token, data.user);
       setUser(data.user);
       return true;
     } catch (err) {
@@ -66,8 +86,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   // ── Logout ───────────────────────────────────────────────
   function logout() {
-    sessionStorage.removeItem("crm_token");
-    sessionStorage.removeItem("crm_user");
+    clearAuth();
     setUser(null);
   }
 
