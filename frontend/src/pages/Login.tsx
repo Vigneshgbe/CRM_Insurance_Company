@@ -33,7 +33,7 @@ export default function Login() {
           navigate("/dashboard");
         }
       } else {
-        setError("Invalid credentials. Try: admin@hypernova.com / password (employee) or james.morrison@email.com / password (client)");
+        setError("Invalid credentials. Try: vignesh@thepadak.com / password (employee) or vignesh@thepadak.com / password (client)");
       }
       setLoading(false);
     }, 800);
@@ -50,7 +50,7 @@ export default function Login() {
           <form onSubmit={handleSubmit} className="space-y-4">
             <div className="space-y-1.5">
               <Label htmlFor="email">Email</Label>
-              <Input id="email" type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="admin@hypernova.com" required />
+              <Input id="email" type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="vignesh@thepadak.com" required />
             </div>
             <div className="space-y-1.5">
               <Label htmlFor="password">Password</Label>
@@ -63,8 +63,8 @@ export default function Login() {
           </form>
           <div className="mt-4 border-t pt-3">
             <p className="text-xs text-muted-foreground text-center mb-1">Demo Accounts:</p>
-            <p className="text-xs text-muted-foreground text-center">Employee: admin@hypernova.com</p>
-            {/* <p className="text-xs text-muted-foreground text-center">Client: james.morrison@email.com</p> */}
+            <p className="text-xs text-muted-foreground text-center">Employee: vignesh@thepadak.com</p>
+            <p className="text-xs text-muted-foreground text-center">Client: thikilan@thepadak.com</p>
             <p className="text-xs text-muted-foreground text-center">Password: password</p>
           </div>
         </CardContent>
