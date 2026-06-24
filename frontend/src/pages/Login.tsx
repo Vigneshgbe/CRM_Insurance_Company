@@ -33,7 +33,7 @@ export default function Login() {
           navigate("/dashboard");
         }
       } else {
-        setError("Invalid credentials. Try: vignesh@thepadak.com / password (employee) or vignesh@thepadak.com / password (client)");
+        setError("Invalid credentials. Try: vignesh@thepadak.com / password (employee) or thikilan@thepadak.com / password (client)");
       }
       setLoading(false);
     }, 800);
