@@ -1,10 +1,10 @@
 -- ============================================================
--- HYPERNOVA CRM — COMPLETE MySQL SCHEMA
+-- PADAK INSURANCE CRM — COMPLETE MySQL SCHEMA
 -- Matches exact data shapes from mockData.ts + all UI tabs
 -- ============================================================
 
-CREATE DATABASE IF NOT EXISTS hypernova_crm CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
-USE hypernova_crm;
+CREATE DATABASE IF NOT EXISTS Padak_insurance_crm CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+USE Padak_insurance_crm;
 
 -- ============================================================
 -- 1. USERS (staff accounts — role: employee or client)
