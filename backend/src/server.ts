@@ -2,16 +2,17 @@ import express from 'express';
 import cors from 'cors';
 import dotenv from 'dotenv';
 import path from 'path';
+
+dotenv.config();
+
 import { testConnection } from './config/database';
 import routes from './routes/index';
 import { errorHandler, notFound } from './middlewares/error.middleware';
 
-dotenv.config();
-
 const app = express();
 const PORT = process.env.PORT || 5000;
 
-// ── Middleware ─────────────────────────────────────────────────
+// ── Middleware ──────────────────────────────────────────────
 app.use(cors({
   origin: process.env.CORS_ORIGIN || '*',
   credentials: true,
@@ -23,23 +24,26 @@ app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true }));
 
 // Static uploads folder
-app.use('/uploads', express.static(path.join(__dirname, '..', 'uploads')));
+app.use('/uploads', express.static(path.join(process.cwd(), 'uploads')));
 
-// ── Health check ──────────────────────────────────────────────
-app.get('/health', (_req, res) => res.json({ status: 'ok', timestamp: new Date().toISOString() }));
+// ── Health check ────────────────────────────────────────────
+app.get('/health', (_req, res) => {
+  res.json({ status: 'ok', timestamp: new Date().toISOString() });
+});
 
-// ── API Routes ────────────────────────────────────────────────
+// ── API Routes ──────────────────────────────────────────────
 app.use('/api', routes);
 
-// ── 404 + Error handlers ──────────────────────────────────────
+// ── 404 + Error handlers ────────────────────────────────────
 app.use(notFound);
 app.use(errorHandler);
 
-// ── Start ─────────────────────────────────────────────────────
+// ── Start ───────────────────────────────────────────────────
 async function start() {
   await testConnection();
   app.listen(PORT, () => {
-    console.log(`🚀 Hypernova CRM API running on port ${PORT}`);
+    console.log(`🚀 Hypernova CRM API running on http://localhost:${PORT}`);
+    console.log(`   DB: ${process.env.DB_NAME || 'padak_insurance_crm'}`);
     console.log(`   ENV: ${process.env.NODE_ENV || 'development'}`);
   });
 }
