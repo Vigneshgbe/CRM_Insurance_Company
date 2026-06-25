@@ -7,15 +7,7 @@ import { Button } from "@/components/ui/button";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { useToast } from "@/hooks/use-toast";
 
-function Field({
-  label,
-  children,
-  className = "",
-}: {
-  label: string;
-  children: React.ReactNode;
-  className?: string;
-}) {
+function Field({ label, children, className = "" }: { label: string; children: React.ReactNode; className?: string }) {
   return (
     <div className={`flex flex-col gap-1 ${className}`}>
       <Label className="text-xs text-muted-foreground">{label}</Label>
@@ -28,19 +20,11 @@ function YesNo({ name, value, onChange }: { name: string; value: string; onChang
   return (
     <div className="flex items-center gap-4 h-9">
       <label className="flex items-center gap-1.5 text-sm cursor-pointer">
-        <Checkbox
-          checked={value === "yes"}
-          onCheckedChange={(c) => onChange(c ? "yes" : "")}
-          aria-label={`${name} yes`}
-        />
+        <Checkbox checked={value === "yes"} onCheckedChange={(c) => onChange(c ? "yes" : "")} aria-label={`${name} yes`} />
         Yes
       </label>
       <label className="flex items-center gap-1.5 text-sm cursor-pointer">
-        <Checkbox
-          checked={value === "no"}
-          onCheckedChange={(c) => onChange(c ? "no" : "")}
-          aria-label={`${name} no`}
-        />
+        <Checkbox checked={value === "no"} onCheckedChange={(c) => onChange(c ? "no" : "")} aria-label={`${name} no`} />
         No
       </label>
     </div>
@@ -55,9 +39,9 @@ function SectionHeader({ title }: { title: string }) {
   );
 }
 
-export default function AccidentDetailsSection() {
+// caseId prop accepted but not used yet — tab is currently local state only
+export default function AccidentDetailsSection({ caseId }: { caseId?: string }) {
   const { toast } = useToast();
-
   const [workAccident, setWorkAccident] = useState("");
   const [commuteAccident, setCommuteAccident] = useState("");
   const [wsibClaim, setWsibClaim] = useState("");
@@ -106,12 +90,8 @@ export default function AccidentDetailsSection() {
         <Field label="Police Department / Collision Reporting Centre"><Input className="h-9" /></Field>
       </div>
       <div className="flex flex-wrap gap-6 mt-4">
-        <label className="flex items-center gap-2 text-sm cursor-pointer">
-          <Checkbox /> Went to collision reporting centre
-        </label>
-        <label className="flex items-center gap-2 text-sm cursor-pointer">
-          <Checkbox /> Police attended
-        </label>
+        <label className="flex items-center gap-2 text-sm cursor-pointer"><Checkbox /> Went to collision reporting centre</label>
+        <label className="flex items-center gap-2 text-sm cursor-pointer"><Checkbox /> Police attended</label>
       </div>
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mt-4">
         <Field label="Incident No"><Input className="h-9" /></Field>
@@ -160,12 +140,8 @@ export default function AccidentDetailsSection() {
 
       <SectionHeader title="Medical Response" />
       <div className="flex flex-col gap-3">
-        <label className="flex items-center gap-2 text-sm cursor-pointer">
-          <Checkbox /> Ambulance attended
-        </label>
-        <label className="flex items-center gap-2 text-sm cursor-pointer">
-          <Checkbox /> Went to the hospital
-        </label>
+        <label className="flex items-center gap-2 text-sm cursor-pointer"><Checkbox /> Ambulance attended</label>
+        <label className="flex items-center gap-2 text-sm cursor-pointer"><Checkbox /> Went to the hospital</label>
         <label className="flex items-start gap-2 text-sm cursor-pointer">
           <Checkbox className="mt-0.5" />
           <span>Went to doctor / nurse practitioner / other Regulated Healthcare Provider (e.g., Physiotherapist, Chiropractor etc.)</span>
