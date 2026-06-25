@@ -1,204 +1,170 @@
-import { useState, useMemo } from "react";
+import { useState, useEffect } from "react";
 import { useAuth } from "@/lib/auth";
-import { cases, caseDocuments, getNotesByCaseId, getStatusHistoryByCaseId } from "@/data/mockData";
 import { formatDate, daysUntil } from "@/lib/formatters";
 import { cn } from "@/lib/utils";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { useToast } from "@/hooks/use-toast";
-import { LogOut, FolderOpen, FileText, Upload, ClipboardList, Clock, User } from "lucide-react";
+import { FileText, Upload, LogOut } from "lucide-react";
+import { useNavigate } from "react-router-dom";
+
+const API = "http://localhost:5000/api";
+const token = () => localStorage.getItem("crm_token") || "";
 
 const statusColor: Record<string, string> = {
-  Active: "bg-success text-success-foreground",
-  Closed: "bg-muted text-muted-foreground",
-  Pending: "bg-warning text-warning-foreground",
-  "On Hold": "bg-muted text-muted-foreground",
-  Settled: "bg-primary text-primary-foreground",
-  Litigation: "bg-destructive text-destructive-foreground",
+  Active: "bg-green-100 text-green-800",
+  Closed: "bg-gray-100 text-gray-600",
+  Pending: "bg-yellow-100 text-yellow-800",
+  Settled: "bg-blue-100 text-blue-800",
+  Litigation: "bg-red-100 text-red-800",
 };
 
 export default function ClientPortal() {
   const { user, logout } = useAuth();
-  const { toast } = useToast();
+  const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState("cases");
+  const [cases, setCases] = useState<any[]>([]);
+  const [documents, setDocuments] = useState<any[]>([]);
+  const [statusHistory, setStatusHistory] = useState<any[]>([]);
+  const [selectedCaseId, setSelectedCaseId] = useState<string | null>(null);
 
-  const myCases = useMemo(() => cases.filter((c) => c.clientId === user?.clientId), [user?.clientId]);
-  const myDocuments = useMemo(
-    () => caseDocuments.filter((d) => myCases.some((c) => c.id === d.caseId)),
-    [myCases]
-  );
+  useEffect(() => {
+    fetch(`${API}/portal/cases`, { headers: { Authorization: `Bearer ${token()}` } })
+      .then(r => r.ok ? r.json() : []).then(setCases);
+    fetch(`${API}/portal/documents`, { headers: { Authorization: `Bearer ${token()}` } })
+      .then(r => r.ok ? r.json() : []).then(setDocuments);
+  }, []);
 
-  const handleUpload = () => {
-    toast({ title: "Document Uploaded", description: "Your document has been submitted for review." });
-  };
+  useEffect(() => {
+    if (!selectedCaseId) return;
+    fetch(`${API}/portal/status-history/${selectedCaseId}`, { headers: { Authorization: `Bearer ${token()}` } })
+      .then(r => r.ok ? r.json() : []).then(setStatusHistory);
+  }, [selectedCaseId]);
+
+  function handleLogout() { logout(); navigate("/login"); }
 
   return (
-    <div className="min-h-screen bg-surface">
+    <div className="min-h-screen bg-muted/30">
       {/* Header */}
-      <header className="bg-sidebar text-sidebar-foreground h-14 flex items-center justify-between px-6 sticky top-0 z-20">
-        <span className="text-lg font-bold tracking-tight">Hypernova CRM — Client Portal</span>
-        <div className="flex items-center gap-3">
-          <div className="flex items-center gap-2">
-            <div className="h-8 w-8 rounded-full bg-sidebar-accent flex items-center justify-center text-xs font-semibold">
-              {user?.name?.split(" ").map((n) => n[0]).join("") || "?"}
-            </div>
-            <span className="text-sm">{user?.name}</span>
-          </div>
-          <Button variant="ghost" size="icon" className="text-sidebar-foreground/70 hover:text-sidebar-foreground" onClick={logout}>
-            <LogOut className="h-4 w-4" />
-          </Button>
+      <header className="bg-white border-b px-6 py-4 flex items-center justify-between">
+        <div>
+          <h1 className="text-lg font-bold">Client Portal</h1>
+          <p className="text-sm text-muted-foreground">Welcome, {user?.name}</p>
         </div>
+        <Button variant="ghost" size="sm" onClick={handleLogout}>
+          <LogOut className="h-4 w-4 mr-1" />Sign Out
+        </Button>
       </header>
 
-      <main className="max-w-5xl mx-auto p-6 space-y-6">
-        {/* Welcome */}
-        <div>
-          <h1 className="text-2xl font-bold text-foreground">Welcome, {user?.name?.split(" ")[0]}</h1>
-          <p className="text-sm text-muted-foreground mt-1">View your cases, upload documents, and track case updates.</p>
-        </div>
-
-        {/* Stat cards */}
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-          <Card>
-            <CardContent className="p-4 flex items-center gap-3">
-              <div className="h-10 w-10 rounded-lg bg-primary/10 flex items-center justify-center"><FolderOpen className="h-5 w-5 text-primary" /></div>
-              <div><p className="text-2xl font-bold">{myCases.length}</p><p className="text-xs text-muted-foreground">My Cases</p></div>
-            </CardContent>
-          </Card>
-          <Card>
-            <CardContent className="p-4 flex items-center gap-3">
-              <div className="h-10 w-10 rounded-lg bg-success/10 flex items-center justify-center"><ClipboardList className="h-5 w-5 text-success" /></div>
-              <div><p className="text-2xl font-bold">{myCases.filter((c) => c.fileStatus === "Active").length}</p><p className="text-xs text-muted-foreground">Active Cases</p></div>
-            </CardContent>
-          </Card>
-          <Card>
-            <CardContent className="p-4 flex items-center gap-3">
-              <div className="h-10 w-10 rounded-lg bg-muted flex items-center justify-center"><FileText className="h-5 w-5 text-muted-foreground" /></div>
-              <div><p className="text-2xl font-bold">{myDocuments.length}</p><p className="text-xs text-muted-foreground">Documents</p></div>
-            </CardContent>
-          </Card>
-        </div>
-
+      <div className="max-w-5xl mx-auto px-4 py-6">
         {/* Tabs */}
-        <Tabs value={activeTab} onValueChange={setActiveTab}>
-          <TabsList>
-            <TabsTrigger value="cases">My Cases</TabsTrigger>
-            <TabsTrigger value="documents">Documents</TabsTrigger>
-            <TabsTrigger value="updates">Status Updates</TabsTrigger>
-          </TabsList>
+        <div className="flex gap-1 border-b mb-6">
+          {["cases", "documents", "status"].map(t => (
+            <button key={t} onClick={() => setActiveTab(t)}
+              className={cn("px-4 py-2 text-sm font-medium border-b-2 -mb-px capitalize transition-colors",
+                activeTab === t ? "border-primary text-primary" : "border-transparent text-muted-foreground hover:text-foreground")}>
+              {t === "status" ? "Status Updates" : t === "cases" ? "My Cases" : "My Documents"}
+            </button>
+          ))}
+        </div>
 
-          <TabsContent value="cases" className="mt-4 space-y-4">
-            {myCases.length === 0 ? (
-              <Card><CardContent className="p-6 text-center text-muted-foreground">No cases found.</CardContent></Card>
-            ) : (
-              myCases.map((c) => {
-                const limDays = daysUntil(c.limitationDate);
-                return (
-                  <Card key={c.id}>
-                    <CardContent className="p-4">
-                      <div className="flex items-start justify-between">
-                        <div>
-                          <p className="font-semibold text-foreground">{c.fileNo}</p>
-                          <div className="flex flex-wrap items-center gap-2 mt-1 text-sm text-muted-foreground">
-                            <Badge className={cn("text-xs", statusColor[c.fileStatus] || "bg-secondary")}>{c.fileStatus}</Badge>
-                            <span>Date of Loss: {formatDate(c.dateOfLoss)}</span>
-                            <span className={cn(limDays <= 7 && limDays >= 0 ? "text-destructive font-semibold" : limDays <= 30 ? "text-orange-500" : "")}>
-                              Limitation: {formatDate(c.limitationDate)}
-                            </span>
-                          </div>
-                          <p className="text-xs text-muted-foreground mt-1">Assigned to: {c.clerkAssigned}</p>
-                        </div>
-                      </div>
-                      {/* Recent notes for this case */}
-                      <div className="mt-3 border-t pt-3">
-                        <p className="text-xs font-medium text-muted-foreground mb-1">Recent Updates</p>
-                        {getNotesByCaseId(c.id).slice(0, 2).map((n) => (
-                          <p key={n.id} className="text-xs text-muted-foreground">{formatDate(n.date)} — {n.text.slice(0, 80)}...</p>
-                        ))}
-                      </div>
-                    </CardContent>
-                  </Card>
-                );
-              })
-            )}
-          </TabsContent>
-
-          <TabsContent value="documents" className="mt-4 space-y-4">
-            <Card>
-              <CardHeader className="pb-2"><CardTitle className="text-sm">Upload a Document</CardTitle></CardHeader>
-              <CardContent>
-                <div className="flex items-end gap-3">
-                  <div className="flex-1">
-                    <Label className="text-xs">Select File</Label>
-                    <Input type="file" accept=".pdf,.jpg,.png,.docx" className="h-9 text-sm mt-1" />
-                  </div>
-                  <Button size="sm" onClick={handleUpload}><Upload className="h-4 w-4 mr-1" /> Upload</Button>
-                </div>
-              </CardContent>
-            </Card>
-            <Card>
-              <CardContent className="p-0">
-                <Table>
-                  <TableHeader><TableRow>
-                    <TableHead className="text-xs">Name</TableHead>
-                    <TableHead className="text-xs">Category</TableHead>
-                    <TableHead className="text-xs">Date</TableHead>
-                    <TableHead className="text-xs">Case</TableHead>
-                  </TableRow></TableHeader>
-                  <TableBody>
-                    {myDocuments.map((d) => {
-                      const c = myCases.find((mc) => mc.id === d.caseId);
-                      return (
-                        <TableRow key={d.id}>
-                          <TableCell className="py-2 text-sm">{d.name}</TableCell>
-                          <TableCell className="py-2 text-sm">{d.category}</TableCell>
-                          <TableCell className="py-2 text-sm">{formatDate(d.date)}</TableCell>
-                          <TableCell className="py-2 text-sm">{c?.fileNo || "—"}</TableCell>
-                        </TableRow>
-                      );
-                    })}
-                    {myDocuments.length === 0 && (
-                      <TableRow><TableCell colSpan={4} className="py-6 text-center text-sm text-muted-foreground">No documents yet.</TableCell></TableRow>
-                    )}
-                  </TableBody>
-                </Table>
-              </CardContent>
-            </Card>
-          </TabsContent>
-
-          <TabsContent value="updates" className="mt-4 space-y-3">
-            {myCases.map((c) => {
-              const history = getStatusHistoryByCaseId(c.id);
+        {/* My Cases */}
+        {activeTab === "cases" && (
+          <div className="space-y-3">
+            {cases.length === 0 ? (
+              <p className="text-sm text-muted-foreground text-center py-8">No cases found.</p>
+            ) : cases.map((c: any) => {
+              const limDays = c.limitationDate ? daysUntil(c.limitationDate) : null;
               return (
-                <Card key={c.id}>
-                  <CardHeader className="pb-2"><CardTitle className="text-sm">{c.fileNo}</CardTitle></CardHeader>
-                  <CardContent>
-                    {history.length === 0 ? (
-                      <p className="text-xs text-muted-foreground">No status changes recorded.</p>
-                    ) : (
-                      <div className="space-y-2">
-                        {history.map((h) => (
-                          <div key={h.id} className="flex items-center gap-2 text-xs">
-                            <Clock className="h-3 w-3 text-muted-foreground shrink-0" />
-                            <span className="text-muted-foreground">{formatDate(h.date)}</span>
-                            <Badge variant="outline" className="text-xs">{h.status}</Badge>
-                            <span className="text-muted-foreground">by {h.changedBy}</span>
-                          </div>
-                        ))}
+                <Card key={c.id} className="cursor-pointer hover:shadow-md transition-shadow" onClick={() => { setSelectedCaseId(c.id); setActiveTab("status"); }}>
+                  <CardContent className="p-4">
+                    <div className="flex items-start justify-between">
+                      <div>
+                        <p className="font-semibold">{c.fileNo}</p>
+                        <p className="text-sm text-muted-foreground">{c.caseType}</p>
+                        <p className="text-xs text-muted-foreground mt-1">Date of Loss: {formatDate(c.dateOfLoss)}</p>
                       </div>
-                    )}
+                      <div className="text-right space-y-1">
+                        <Badge className={cn("text-xs", statusColor[c.fileStatus] || "bg-gray-100")}>{c.fileStatus}</Badge>
+                        {limDays !== null && limDays >= 0 && limDays <= 60 && (
+                          <p className={cn("text-xs", limDays <= 30 ? "text-red-600 font-semibold" : "text-orange-500")}>
+                            Limitation in {limDays}d
+                          </p>
+                        )}
+                      </div>
+                    </div>
                   </CardContent>
                 </Card>
               );
             })}
-          </TabsContent>
-        </Tabs>
-      </main>
+          </div>
+        )}
+
+        {/* My Documents */}
+        {activeTab === "documents" && (
+          <Card>
+            <CardHeader className="pb-3 flex flex-row items-center justify-between">
+              <CardTitle className="text-base">My Documents</CardTitle>
+            </CardHeader>
+            <CardContent className="p-0">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead className="text-xs">Name</TableHead>
+                    <TableHead className="text-xs">Category</TableHead>
+                    <TableHead className="text-xs">Date</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {documents.length === 0 ? (
+                    <TableRow><TableCell colSpan={3} className="text-center text-muted-foreground py-8 text-sm">
+                      <FileText className="h-8 w-8 mx-auto mb-2 opacity-30" />No documents yet.
+                    </TableCell></TableRow>
+                  ) : documents.map((d: any) => (
+                    <TableRow key={d.id}>
+                      <TableCell className="py-2 text-sm">{d.name}</TableCell>
+                      <TableCell className="py-2 text-sm text-muted-foreground">{d.category}</TableCell>
+                      <TableCell className="py-2 text-sm text-muted-foreground">{formatDate(d.date)}</TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </CardContent>
+          </Card>
+        )}
+
+        {/* Status Updates */}
+        {activeTab === "status" && (
+          <div className="space-y-4">
+            {cases.length > 0 && (
+              <div className="flex gap-2 flex-wrap">
+                {cases.map((c: any) => (
+                  <Button key={c.id} size="sm" variant={selectedCaseId === c.id ? "default" : "outline"}
+                    onClick={() => setSelectedCaseId(c.id)}>
+                    {c.fileNo}
+                  </Button>
+                ))}
+              </div>
+            )}
+            {!selectedCaseId ? (
+              <p className="text-sm text-muted-foreground text-center py-8">Select a case above to view status history.</p>
+            ) : statusHistory.length === 0 ? (
+              <p className="text-sm text-muted-foreground text-center py-8">No status history yet.</p>
+            ) : (
+              <div className="space-y-2">
+                {statusHistory.map((h: any) => (
+                  <div key={h.id} className="flex items-center gap-3 p-3 bg-white rounded border">
+                    <Badge variant="secondary" className="text-xs">{h.status}</Badge>
+                    <span className="text-sm text-muted-foreground">{formatDate(h.date)}</span>
+                    {h.changedBy && <span className="text-xs text-muted-foreground">by {h.changedBy}</span>}
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
+      </div>
     </div>
   );
 }
