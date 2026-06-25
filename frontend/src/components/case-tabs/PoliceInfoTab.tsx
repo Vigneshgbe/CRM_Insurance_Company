@@ -1,80 +1,66 @@
-import { useForm } from "react-hook-form";
+import { useState, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
-import { useState } from "react";
-import { PROVINCES } from "@/lib/constants";
+
+const API = "http://localhost:5000/api";
+const token = () => localStorage.getItem("crm_token") || "";
+
+const F = ({ label, value, onChange }: any) => (
+  <div>
+    <Label className="text-xs">{label}</Label>
+    <Input value={value || ""} onChange={e => onChange(e.target.value)} className="mt-1 h-9 text-sm" />
+  </div>
+);
 
 export default function PoliceInfoTab({ caseId }: { caseId: string }) {
   const { toast } = useToast();
-  const [loading, setLoading] = useState(false);
-  const { register, handleSubmit, watch, setValue } = useForm({
-    defaultValues: {
-      reportedDate: "Yes", reportOrdered: "Yes", reportOrderedDate: "2024-07-01",
-      policeCentre: "Toronto Police Service", policeOfficer: "Const. M. Roberts", badgeNumber: "4521",
-      incidentNo: "TPS-2024-45678", division: "Traffic Services", address: "40 College St",
-      city: "Toronto", provincePC: "Ontario M5G 2J3",
-      requestDate: "2024-06-20", receivedDate: "2024-07-15",
-      phone: "4168082222", intersection: "Highway 401 & Yonge Street", timeOfAccident: "14:30",
-      accidentDescription: "Two-vehicle collision on Highway 401 westbound. Vehicle 1 (client) struck by Vehicle 2 which changed lanes without signalling. V2 driver charged with careless driving.",
-    },
-  });
+  const [saving, setSaving] = useState(false);
+  const [d, setD] = useState<any>({});
+  const s = (k: string) => (v: string) => setD((p: any) => ({ ...p, [k]: v }));
 
-  const onSubmit = () => {
-    setLoading(true);
-    setTimeout(() => { toast({ title: "Police Info Saved" }); setLoading(false); }, 500);
-  };
+  useEffect(() => {
+    fetch(`${API}/cases/${caseId}/police-info`, { headers: { Authorization: `Bearer ${token()}` } })
+      .then(r => r.ok ? r.json() : null).then(r => { if (r) setD(r); });
+  }, [caseId]);
 
-  const F = ({ label, name, type = "text" }: { label: string; name: string; type?: string }) => (
-    <div><Label className="text-xs">{label}</Label><Input {...register(name as any)} type={type} className="h-8 text-xs mt-1" /></div>
-  );
+  async function save() {
+    setSaving(true);
+    try {
+      const r = await fetch(`${API}/cases/${caseId}/police-info`, { method: "POST", headers: { "Content-Type": "application/json", Authorization: `Bearer ${token()}` }, body: JSON.stringify(d) });
+      if (!r.ok) throw new Error();
+      toast({ title: "Saved" });
+    } catch { toast({ title: "Save failed", variant: "destructive" }); }
+    finally { setSaving(false); }
+  }
 
   return (
-    <form onSubmit={handleSubmit(onSubmit)}>
+    <div className="p-4 space-y-4">
       <Card>
-        <CardHeader className="pb-2"><CardTitle className="text-sm">Police Information</CardTitle></CardHeader>
-        <CardContent>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-            <div><Label className="text-xs">Reported Date?</Label>
-              <Select value={watch("reportedDate" as any)} onValueChange={(v) => setValue("reportedDate" as any, v)}>
-                <SelectTrigger className="h-8 text-xs mt-1"><SelectValue /></SelectTrigger>
-                <SelectContent><SelectItem value="Yes">Yes</SelectItem><SelectItem value="No">No</SelectItem></SelectContent>
-              </Select>
-            </div>
-            <div><Label className="text-xs">Report Ordered?</Label>
-              <Select value={watch("reportOrdered" as any)} onValueChange={(v) => setValue("reportOrdered" as any, v)}>
-                <SelectTrigger className="h-8 text-xs mt-1"><SelectValue /></SelectTrigger>
-                <SelectContent><SelectItem value="Yes">Yes</SelectItem><SelectItem value="No">No</SelectItem></SelectContent>
-              </Select>
-            </div>
-            <F label="Report Ordered Date" name="reportOrderedDate" type="date" />
-            <F label="Police/Centre" name="policeCentre" />
-            <F label="Police Officer" name="policeOfficer" />
-            <F label="Badge Number" name="badgeNumber" />
-            <F label="Incident No" name="incidentNo" />
-            <F label="Division" name="division" />
-            <F label="Address" name="address" />
-            <F label="City" name="city" />
-            <F label="Province/PC" name="provincePC" />
-            <F label="Request Date" name="requestDate" type="date" />
-            <F label="Received" name="receivedDate" type="date" />
-            <F label="Phone" name="phone" />
-            <F label="Intersection" name="intersection" />
-            <F label="Time of Accident" name="timeOfAccident" type="time" />
-          </div>
-          <div className="mt-3">
-            <Label className="text-xs">Description of Accident</Label>
-            <Textarea {...register("accidentDescription")} rows={4} className="text-xs mt-1" />
+        <CardHeader className="pb-2"><CardTitle className="text-sm">Police Report Information</CardTitle></CardHeader>
+        <CardContent className="grid grid-cols-2 gap-3">
+          <F label="Police Department / Centre" value={d.policeCentre} onChange={s("policeCentre")} />
+          <F label="Officer Name" value={d.officerName} onChange={s("officerName")} />
+          <F label="Badge Number" value={d.badgeNumber} onChange={s("badgeNumber")} />
+          <F label="Incident / Report No." value={d.incidentNo} onChange={s("incidentNo")} />
+          <F label="Report Date" value={d.reportDate} onChange={s("reportDate")} />
+          <F label="Division" value={d.division} onChange={s("division")} />
+          <F label="Station Address" value={d.stationAddress} onChange={s("stationAddress")} />
+          <F label="City" value={d.city} onChange={s("city")} />
+          <F label="Phone" value={d.phone} onChange={s("phone")} />
+          <F label="Date Report Requested" value={d.requestDate} onChange={s("requestDate")} />
+          <F label="Date Report Received" value={d.receivedDate} onChange={s("receivedDate")} />
+          <F label="Report Ordered" value={d.reportOrdered} onChange={s("reportOrdered")} />
+          <div className="col-span-2">
+            <Label className="text-xs">Notes</Label>
+            <Textarea value={d.notes || ""} onChange={e => s("notes")(e.target.value)} className="mt-1 text-sm" rows={3} />
           </div>
         </CardContent>
       </Card>
-      <div className="flex justify-end mt-4">
-        <Button type="submit" disabled={loading}>{loading ? "Saving..." : "Save Police Info"}</Button>
-      </div>
-    </form>
+      <div className="flex justify-end"><Button onClick={save} disabled={saving}>{saving ? "Saving..." : "Save"}</Button></div>
+    </div>
   );
 }

@@ -1,58 +1,59 @@
-import { useForm } from "react-hook-form";
+import { useState, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/hooks/use-toast";
-import { useState } from "react";
-import { ASSESSMENT_COMPANIES, PROVINCES } from "@/lib/constants";
+
+const API = "http://localhost:5000/api";
+const token = () => localStorage.getItem("crm_token") || "";
+const F = ({ label, value, onChange }: any) => (
+  <div><Label className="text-xs">{label}</Label><Input value={value || ""} onChange={e => onChange(e.target.value)} className="mt-1 h-9 text-sm" /></div>
+);
 
 export default function SpecialistTab({ caseId }: { caseId: string }) {
   const { toast } = useToast();
-  const [loading, setLoading] = useState(false);
-  const { register, handleSubmit, watch, setValue } = useForm({
-    defaultValues: {
-      company: "Unison Medical Assessments", address: "3080 Yonge Street, Suite 5060",
-      city: "Toronto", province: "Ontario", postCode: "M4N 3N1",
-      phone: "4165550100", fax: "4165550101",
-    },
-  });
+  const [saving, setSaving] = useState(false);
+  const [d, setD] = useState<any>({});
+  const s = (k: string) => (v: string) => setD((p: any) => ({ ...p, [k]: v }));
 
-  const onSubmit = () => {
-    setLoading(true);
-    setTimeout(() => { toast({ title: "Specialist Info Saved" }); setLoading(false); }, 500);
-  };
+  useEffect(() => {
+    fetch(`${API}/cases/${caseId}/specialist`, { headers: { Authorization: `Bearer ${token()}` } })
+      .then(r => r.ok ? r.json() : null).then(r => { if (r) setD(r); });
+  }, [caseId]);
+
+  async function save() {
+    setSaving(true);
+    try {
+      const r = await fetch(`${API}/cases/${caseId}/specialist`, { method: "POST", headers: { "Content-Type": "application/json", Authorization: `Bearer ${token()}` }, body: JSON.stringify(d) });
+      if (!r.ok) throw new Error();
+      toast({ title: "Saved" });
+    } catch { toast({ title: "Save failed", variant: "destructive" }); }
+    finally { setSaving(false); }
+  }
 
   return (
-    <form onSubmit={handleSubmit(onSubmit)}>
+    <div className="p-4 space-y-4">
       <Card>
-        <CardHeader className="pb-2"><CardTitle className="text-sm">Specialist / Assessment Company</CardTitle></CardHeader>
-        <CardContent>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-3 max-w-3xl">
-            <div><Label className="text-xs">Assessment Company</Label>
-              <Select value={watch("company")} onValueChange={(v) => setValue("company", v)}>
-                <SelectTrigger className="h-8 text-xs mt-1"><SelectValue /></SelectTrigger>
-                <SelectContent>{ASSESSMENT_COMPANIES.map((c) => <SelectItem key={c} value={c}>{c}</SelectItem>)}</SelectContent>
-              </Select>
-            </div>
-            <div><Label className="text-xs">Address</Label><Input {...register("address")} className="h-8 text-xs mt-1" /></div>
-            <div><Label className="text-xs">City</Label><Input {...register("city")} className="h-8 text-xs mt-1" /></div>
-            <div><Label className="text-xs">Province</Label>
-              <Select value={watch("province")} onValueChange={(v) => setValue("province", v)}>
-                <SelectTrigger className="h-8 text-xs mt-1"><SelectValue /></SelectTrigger>
-                <SelectContent>{PROVINCES.map((p) => <SelectItem key={p} value={p}>{p}</SelectItem>)}</SelectContent>
-              </Select>
-            </div>
-            <div><Label className="text-xs">Post Code</Label><Input {...register("postCode")} className="h-8 text-xs mt-1" /></div>
-            <div><Label className="text-xs">Phone</Label><Input {...register("phone")} className="h-8 text-xs mt-1" /></div>
-            <div><Label className="text-xs">Fax</Label><Input {...register("fax")} className="h-8 text-xs mt-1" /></div>
+        <CardHeader className="pb-2"><CardTitle className="text-sm">Specialist / Assessment Centre</CardTitle></CardHeader>
+        <CardContent className="grid grid-cols-2 gap-3">
+          <F label="Company / Centre Name" value={d.company} onChange={s("company")} />
+          <F label="Specialist Name" value={d.specialistName} onChange={s("specialistName")} />
+          <F label="Address" value={d.address} onChange={s("address")} />
+          <F label="City" value={d.city} onChange={s("city")} />
+          <F label="Phone" value={d.phone} onChange={s("phone")} />
+          <F label="Fax" value={d.fax} onChange={s("fax")} />
+          <F label="Specialty Type" value={d.specialtyType} onChange={s("specialtyType")} />
+          <F label="Assessment Date" value={d.assessmentDate} onChange={s("assessmentDate")} />
+          <F label="Report Date" value={d.reportDate} onChange={s("reportDate")} />
+          <div className="col-span-2">
+            <Label className="text-xs">Findings</Label>
+            <Textarea value={d.findings || ""} onChange={e => s("findings")(e.target.value)} className="mt-1 text-sm" rows={3} />
           </div>
         </CardContent>
       </Card>
-      <div className="flex justify-end mt-4">
-        <Button type="submit" disabled={loading}>{loading ? "Saving..." : "Save Specialist Info"}</Button>
-      </div>
-    </form>
+      <div className="flex justify-end"><Button onClick={save} disabled={saving}>{saving ? "Saving..." : "Save"}</Button></div>
+    </div>
   );
 }

@@ -1,105 +1,97 @@
-import { useForm } from "react-hook-form";
+import { useState, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
-import { useState } from "react";
+
+const API = "http://localhost:5000/api";
+const token = () => localStorage.getItem("crm_token") || "";
+
+async function get(url: string) {
+  const r = await fetch(url, { headers: { Authorization: `Bearer ${token()}` } });
+  if (!r.ok) return null;
+  return r.json();
+}
+async function post(url: string, body: any) {
+  const r = await fetch(url, { method: "POST", headers: { "Content-Type": "application/json", Authorization: `Bearer ${token()}` }, body: JSON.stringify(body) });
+  if (!r.ok) throw new Error("Save failed");
+  return r.json();
+}
+
+const F = ({ label, value, onChange, placeholder }: any) => (
+  <div>
+    <Label className="text-xs">{label}</Label>
+    <Input value={value || ""} onChange={e => onChange(e.target.value)} placeholder={placeholder || ""} className="mt-1 h-9 text-sm" />
+  </div>
+);
 
 export default function ThirdPartyTab({ caseId }: { caseId: string }) {
   const { toast } = useToast();
-  const [loading, setLoading] = useState(false);
-  const { register, handleSubmit } = useForm({
-    defaultValues: {
-      driverName: "Robert Chen", driverAddress: "55 Eglinton Ave E", driverCity: "Toronto",
-      driverProvPC: "Ontario M4P 1G8", homePhone: "4165559876", workPhone: "4165558765",
-      employerName: "Metro Logistics", workAddress: "200 Front St", workCity: "Toronto", workProvPC: "Ontario M5V 3K2",
-      driverLicense: "C4567-89012-30415", driverDOB: "1990-04-22",
-      autoMake: "Honda", autoModel: "Civic", autoYear: "2021", plateNumber: "WXYZ 789",
-      vehicleOwner: "Robert Chen", ownerAddress: "55 Eglinton Ave E", ownerCity: "Toronto", ownerPostal: "M4P 1G8", ownerPhone: "4165559876",
-      insuranceCompany: "Intact Insurance", insAddress: "700 University Ave", insCity: "Toronto", insPostal: "M5G 0A1",
-      insAdjuster: "Patricia Lee", insPhone: "4165554321", insFax: "4165554322", insExt: "245",
-      insClaimNo: "INT-2024-567890", insPolicyNo: "POL-INT-123456",
-      witness1Name: "Sarah Miller", witness1Phone: "4165551111",
-      witness2Name: "Tom Garcia", witness2Phone: "4165552222",
-    },
-  });
+  const [saving, setSaving] = useState(false);
+  const [d, setD] = useState<any>({});
+  const s = (k: string) => (v: string) => setD((p: any) => ({ ...p, [k]: v }));
 
-  const onSubmit = () => {
-    setLoading(true);
-    setTimeout(() => { toast({ title: "Third Party Info Saved" }); setLoading(false); }, 500);
-  };
+  useEffect(() => { get(`${API}/cases/${caseId}/third-party`).then(r => { if (r) setD(r); }); }, [caseId]);
 
-  const F = ({ label, name }: { label: string; name: string }) => (
-    <div><Label className="text-xs">{label}</Label><Input {...register(name as any)} className="h-8 text-xs mt-1" /></div>
-  );
+  async function save() {
+    setSaving(true);
+    try { await post(`${API}/cases/${caseId}/third-party`, d); toast({ title: "Saved" }); }
+    catch { toast({ title: "Save failed", variant: "destructive" }); }
+    finally { setSaving(false); }
+  }
 
   return (
-    <form onSubmit={handleSubmit(onSubmit)}>
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-        <Card>
-          <CardHeader className="pb-2"><CardTitle className="text-sm">Driver Information</CardTitle></CardHeader>
-          <CardContent>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-              <F label="Driver Name" name="driverName" />
-              <F label="Address" name="driverAddress" />
-              <F label="City" name="driverCity" />
-              <F label="Province/PC" name="driverProvPC" />
-              <F label="Home Phone" name="homePhone" />
-              <F label="Work Phone" name="workPhone" />
-              <F label="Employer Name" name="employerName" />
-              <F label="Work Address" name="workAddress" />
-              <F label="City" name="workCity" />
-              <F label="Province/PC" name="workProvPC" />
-              <F label="Driver's License No" name="driverLicense" />
-              <F label="Date of Birth" name="driverDOB" />
-              <F label="Auto Make" name="autoMake" />
-              <F label="Model" name="autoModel" />
-              <F label="Year" name="autoYear" />
-              <F label="Plate Number" name="plateNumber" />
-              <F label="Owner of Vehicle" name="vehicleOwner" />
-              <F label="Owner Address" name="ownerAddress" />
-              <F label="City" name="ownerCity" />
-              <F label="Postal Code" name="ownerPostal" />
-              <F label="Phone" name="ownerPhone" />
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader className="pb-2"><CardTitle className="text-sm">Third Party Insurance</CardTitle></CardHeader>
-          <CardContent>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-              <F label="Insurance Company" name="insuranceCompany" />
-              <F label="Address" name="insAddress" />
-              <F label="City" name="insCity" />
-              <F label="Postal Code" name="insPostal" />
-              <F label="Adjuster Name" name="insAdjuster" />
-              <F label="Phone" name="insPhone" />
-              <F label="Fax" name="insFax" />
-              <F label="Extension" name="insExt" />
-              <F label="Claim Number" name="insClaimNo" />
-              <F label="Policy Number" name="insPolicyNo" />
-            </div>
-          </CardContent>
-        </Card>
-      </div>
-
-      <Card className="mt-4">
-        <CardHeader className="pb-2"><CardTitle className="text-sm">Witnesses</CardTitle></CardHeader>
-        <CardContent>
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
-            <F label="Witness 1 Name" name="witness1Name" />
-            <F label="Phone" name="witness1Phone" />
-            <F label="Witness 2 Name" name="witness2Name" />
-            <F label="Phone" name="witness2Phone" />
-          </div>
+    <div className="p-4 space-y-4">
+      <Card>
+        <CardHeader className="pb-2"><CardTitle className="text-sm">Driver Information</CardTitle></CardHeader>
+        <CardContent className="grid grid-cols-2 gap-3">
+          <F label="Driver Name" value={d.driverName} onChange={s("driverName")} />
+          <F label="Driver DOB" value={d.driverDob} onChange={s("driverDob")} />
+          <F label="Home Phone" value={d.driverHomePhone} onChange={s("driverHomePhone")} />
+          <F label="Work Phone" value={d.driverWorkPhone} onChange={s("driverWorkPhone")} />
+          <F label="Driver Address" value={d.driverAddress} onChange={s("driverAddress")} />
+          <F label="City" value={d.driverCity} onChange={s("driverCity")} />
+          <F label="Province" value={d.driverProvince} onChange={s("driverProvince")} />
+          <F label="Driver License No." value={d.driverLicenseNo} onChange={s("driverLicenseNo")} />
+          <F label="Employer" value={d.driverEmployer} onChange={s("driverEmployer")} />
+          <F label="Work Address" value={d.driverWorkAddress} onChange={s("driverWorkAddress")} />
         </CardContent>
       </Card>
-
-      <div className="flex justify-end mt-4">
-        <Button type="submit" disabled={loading}>{loading ? "Saving..." : "Save Third Party Info"}</Button>
-      </div>
-    </form>
+      <Card>
+        <CardHeader className="pb-2"><CardTitle className="text-sm">Vehicle Information</CardTitle></CardHeader>
+        <CardContent className="grid grid-cols-2 gap-3">
+          <F label="Auto Make" value={d.autoMake} onChange={s("autoMake")} />
+          <F label="Auto Model" value={d.autoModel} onChange={s("autoModel")} />
+          <F label="Year" value={d.autoYear} onChange={s("autoYear")} />
+          <F label="Plate Number" value={d.plateNumber} onChange={s("plateNumber")} />
+          <F label="Owner of Vehicle" value={d.ownerOfVehicle} onChange={s("ownerOfVehicle")} />
+          <F label="Owner Address" value={d.ownerAddress} onChange={s("ownerAddress")} />
+          <F label="Owner City" value={d.ownerCity} onChange={s("ownerCity")} />
+          <F label="Owner Phone" value={d.ownerPhone} onChange={s("ownerPhone")} />
+        </CardContent>
+      </Card>
+      <Card>
+        <CardHeader className="pb-2"><CardTitle className="text-sm">Third Party Insurance</CardTitle></CardHeader>
+        <CardContent className="grid grid-cols-2 gap-3">
+          <F label="Insurance Company" value={d.insuranceCompany} onChange={s("insuranceCompany")} />
+          <F label="Adjuster Name" value={d.adjusterName} onChange={s("adjusterName")} />
+          <F label="Adjuster Phone" value={d.adjusterPhone} onChange={s("adjusterPhone")} />
+          <F label="Adjuster Fax" value={d.adjusterFax} onChange={s("adjusterFax")} />
+          <F label="Claim Number" value={d.claimNumber} onChange={s("claimNumber")} />
+          <F label="Policy Number" value={d.policyNumber} onChange={s("policyNumber")} />
+        </CardContent>
+      </Card>
+      <Card>
+        <CardHeader className="pb-2"><CardTitle className="text-sm">Witnesses</CardTitle></CardHeader>
+        <CardContent className="grid grid-cols-2 gap-3">
+          <F label="Witness 1 Name" value={d.witness1Name} onChange={s("witness1Name")} />
+          <F label="Witness 1 Phone" value={d.witness1Phone} onChange={s("witness1Phone")} />
+          <F label="Witness 2 Name" value={d.witness2Name} onChange={s("witness2Name")} />
+          <F label="Witness 2 Phone" value={d.witness2Phone} onChange={s("witness2Phone")} />
+        </CardContent>
+      </Card>
+      <div className="flex justify-end"><Button onClick={save} disabled={saving}>{saving ? "Saving..." : "Save"}</Button></div>
+    </div>
   );
 }
