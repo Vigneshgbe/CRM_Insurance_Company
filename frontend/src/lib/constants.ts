@@ -98,3 +98,4 @@ export const PSYCHOLOGICAL_CONDITIONS = [
 export const LAW_FIRMS = ["Smith & Associates LLP", "Johnson Legal Group", "Williams & Partners", "Brown Law Firm", "Davis & Co. Legal"];
 export const LAWYERS = ["John Smith", "Sarah Johnson", "Michael Williams", "Emily Brown", "David Davis"];
 export const ASSESSMENT_COMPANIES = ["Unison Medical Assessments", "InHouse Medical Corp", "Sibley & Associates", "Premier Assessments Inc."];
+export const API_BASE_URL = "http://localhost:5000/api";
