@@ -3,42 +3,24 @@ import { authenticate } from '../middlewares/auth.middleware';
 
 import { login } from '../controllers/auth.controller';
 
-import { getDashboardStats, getRecentCases, getUpcomingLimitations } from '../controllers/dashboard.controller';
-import { getRecentActivities } from '../controllers/activities.controller';
-
+import { getDashboardStats, getRecentCases, getUpcomingLimitations, getReferrers } from '../controllers/dashboard.controller';
+import { getRecentActivities, getActivitiesByCaseId, createActivity } from '../controllers/activities.controller';
 import { getCases, createCase, getCaseById, updateCase } from '../controllers/cases.controller';
 import { getClients, createClient, getClientById, updateClient } from '../controllers/clients.controller';
-
-// notes.controller uses getNotesByCaseId (not getNotes)
 import { getNotesByCaseId, createNote, deleteNote } from '../controllers/notes.controller';
-
-// activities.controller uses getActivitiesByCaseId (not getActivities)
-import { getActivitiesByCaseId, createActivity } from '../controllers/activities.controller';
-
-// history.controller uses getHistoryByCaseId and getStatusHistoryByCaseId
 import { getHistoryByCaseId, getStatusHistoryByCaseId } from '../controllers/history.controller';
-
 import { getContactAccess, createContactAccess, deleteContactAccess } from '../controllers/contact-access.controller';
-
 import { getDocumentsByCase, uploadDocument, getAllDocuments, deleteDocument, renameDocument, upload as docUpload } from '../controllers/documents.controller';
-
 import { getSettlement, upsertSettlement } from '../controllers/settlement.controller';
 import { getThirdParty, upsertThirdParty } from '../controllers/third-party.controller';
 import { getNoFault, upsertNoFault } from '../controllers/no-fault.controller';
-
 import { getMedical, saveMedical } from '../controllers/medical.controller';
 import { getEmployment, saveEmployment } from '../controllers/employment.controller';
-
-// police-info, lawyers, specialist — new controllers (save* naming)
 import { getPoliceInfo, savePoliceInfo } from '../controllers/police-info.controller';
 import { getLawyers, saveLawyers } from '../controllers/lawyers.controller';
 import { getSpecialist, saveSpecialist } from '../controllers/specialist.controller';
-
-// client-info and initial-interview — new controllers (save* naming)
 import { getClientInfo, saveClientInfo } from '../controllers/client-info.controller';
 import { getInitialInterview, saveInitialInterview } from '../controllers/initial-interview.controller';
-
-// misc.controller has users, reports, portal, ocf
 import {
   getUsers, createUser, deleteUser,
   getStatusSummary, getMonthlyStats, getLimitationAlerts, getSettlementsSummary,
@@ -59,6 +41,9 @@ router.get('/dashboard/stats',                getDashboardStats);
 router.get('/dashboard/recent-cases',         getRecentCases);
 router.get('/dashboard/upcoming-limitations', getUpcomingLimitations);
 router.get('/dashboard/recent-activities',    getRecentActivities);
+
+// Referrers
+router.get('/referrers', getReferrers);
 
 // Cases
 router.get('/cases',     getCases);

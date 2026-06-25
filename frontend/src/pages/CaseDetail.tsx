@@ -245,9 +245,9 @@ export default function CaseDetail() {
       .finally(() => setLoading(false));
 
     fetch(`${API_BASE_URL}/referrers`, { headers: { Authorization: `Bearer ${token}` } })
-      .then(r => r.json())
-      .then(setReferrers)
-      .catch(() => {});
+    .then(r => r.ok ? r.json() : [])
+    .then(data => setReferrers(Array.isArray(data) ? data : []))
+    .catch(() => setReferrers([]));
   }, [caseId]);
 
   const set = (key: string, val: string) => setForm(prev => ({ ...prev, [key]: val }));
