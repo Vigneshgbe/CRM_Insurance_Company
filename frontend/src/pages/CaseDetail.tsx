@@ -1,56 +1,53 @@
-import { useState } from "react";
-import { useParams, useNavigate } from "react-router-dom";
-import { useForm, Controller } from "react-hook-form";
+import { useState, useEffect } from "react";
+import { useParams, useNavigate, Link } from "react-router-dom";
 import { AppLayout } from "@/components/layout/AppLayout";
-import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { getCaseById, referrers } from "@/data/mockData";
-import { formatDate, daysUntil, formatMobileNumber, getMobileTelUri, validateMobileNumber } from "@/lib/formatters";
-import { FILE_STATUSES, PROVINCES, CASE_TYPES } from "@/lib/constants";
 import { cn } from "@/lib/utils";
-import { useToast } from "@/hooks/use-toast";
-import { Pencil, X, Save, Upload, Phone } from "lucide-react";
-import SignaturePad from "@/components/SignaturePad";
+import { formatDate, daysUntil, getMobileTelUri, formatMobileNumber } from "@/lib/formatters";
+import { casesApi } from "@/lib/api";
+import { ChevronLeft, Phone } from "lucide-react";
+
+// Tab components — these are your existing components, unchanged
 import NotesTab from "@/components/case-tabs/NotesTab";
-import DocumentsTab from "@/components/case-tabs/DocumentsTab";
-import InitialInterviewTab from "@/components/case-tabs/InitialInterviewTab";
-import HistoryTab from "@/components/case-tabs/HistoryTab";
 import ActivitiesTab from "@/components/case-tabs/ActivitiesTab";
-import NoFaultTab from "@/components/case-tabs/NoFaultTab";
+import HistoryTab from "@/components/case-tabs/HistoryTab";
+import StatusTab from "@/components/case-tabs/StatusTab";
+import ContactAccessTab from "@/components/case-tabs/ContactAccessTab";
+import DocumentsTab from "@/components/case-tabs/DocumentsTab";
+import SettlementTab from "@/components/case-tabs/SettlementTab";
+
+// These tabs still use mock data or show placeholder — they work, data just empty until connected
+// Import your existing ones:
 import ThirdPartyTab from "@/components/case-tabs/ThirdPartyTab";
-import ClientInfoTab from "@/components/case-tabs/ClientInfoTab";
+import NoFaultTab from "@/components/case-tabs/NoFaultTab";
+import MedicalTab from "@/components/case-tabs/MedicalTab";
 import EmploymentTab from "@/components/case-tabs/EmploymentTab";
 import PoliceInfoTab from "@/components/case-tabs/PoliceInfoTab";
 import LawyersTab from "@/components/case-tabs/LawyersTab";
-import MedicalTab from "@/components/case-tabs/MedicalTab";
 import SpecialistTab from "@/components/case-tabs/SpecialistTab";
-import SettlementTab from "@/components/case-tabs/SettlementTab";
-import ContactAccessTab from "@/components/case-tabs/ContactAccessTab";
-import StatusTab from "@/components/case-tabs/StatusTab";
+import InitialInterviewTab from "@/components/case-tabs/InitialInterviewTab";
+import ClientInfoTab from "@/components/case-tabs/ClientInfoTab";
 import OcfFormsTab from "@/components/case-tabs/OcfFormsTab";
 
 const TABS = [
-  { key: "notes", label: "Notes" },
-  { key: "documents", label: "Documents" },
-  { key: "initial-interview", label: "Initial Interview" },
-  { key: "history", label: "History" },
-  { key: "activities", label: "Activities" },
-  { key: "no-fault", label: "No Fault" },
-  { key: "third-party", label: "Third Party" },
-  { key: "client-info", label: "Client Info" },
-  { key: "employment", label: "Employment" },
-  { key: "police-info", label: "Police Info" },
-  { key: "lawyers", label: "Lawyers" },
-  { key: "medical", label: "Medical" },
-  { key: "specialist", label: "Specialist / Assessment" },
-  { key: "settlement", label: "Settlement Proposal" },
-  { key: "contact-access", label: "Contact Access" },
-  { key: "status", label: "Status" },
-  { key: "ocf-forms", label: "OCF Forms" },
+  { id: "notes", label: "Notes" },
+  { id: "activities", label: "Activities" },
+  { id: "history", label: "History" },
+  { id: "status", label: "Status" },
+  { id: "initial-interview", label: "Initial Interview" },
+  { id: "client-info", label: "Client Info" },
+  { id: "no-fault", label: "No Fault" },
+  { id: "third-party", label: "Third Party" },
+  { id: "employment", label: "Employment" },
+  { id: "medical", label: "Medical" },
+  { id: "police-info", label: "Police Info" },
+  { id: "lawyers", label: "Lawyers" },
+  { id: "specialist", label: "Specialist" },
+  { id: "settlement", label: "Settlement" },
+  { id: "contact-access", label: "Contact Access" },
+  { id: "documents", label: "Documents" },
+  { id: "ocf-forms", label: "OCF Forms" },
 ];
 
 const statusColor: Record<string, string> = {
@@ -60,329 +57,134 @@ const statusColor: Record<string, string> = {
   "On Hold": "bg-muted text-muted-foreground",
   Settled: "bg-primary text-primary-foreground",
   Litigation: "bg-destructive text-destructive-foreground",
-};
-
-const tabComponents: Record<string, React.FC<{ caseId: string }>> = {
-  notes: NotesTab,
-  documents: DocumentsTab,
-  "initial-interview": InitialInterviewTab,
-  history: HistoryTab,
-  activities: ActivitiesTab,
-  "no-fault": NoFaultTab,
-  "third-party": ThirdPartyTab,
-  "client-info": ClientInfoTab,
-  employment: EmploymentTab,
-  "police-info": PoliceInfoTab,
-  lawyers: LawyersTab,
-  medical: MedicalTab,
-  specialist: SpecialistTab,
-  settlement: SettlementTab,
-  "contact-access": ContactAccessTab,
-  status: StatusTab,
-  "ocf-forms": OcfFormsTab,
+  Mediation: "bg-warning text-warning-foreground",
+  Arbitration: "bg-destructive text-destructive-foreground",
 };
 
 export default function CaseDetail() {
-  const { caseId, tab } = useParams();
+  const { caseId, tab } = useParams<{ caseId: string; tab?: string }>();
   const navigate = useNavigate();
-  const { toast } = useToast();
   const activeTab = tab || "notes";
-  const caseData = getCaseById(caseId || "1");
-  const [editing, setEditing] = useState(false);
-  const [saving, setSaving] = useState(false);
-  const [signatureUrl, setSignatureUrl] = useState(caseData?.clientSignatureUrl || "");
-  const [referrerSearch, setReferrerSearch] = useState("");
-  const [mobileError, setMobileError] = useState("");
 
-  const { register, handleSubmit, control, reset } = useForm({
-    defaultValues: {
-      fileNo: caseData?.fileNo || "",
-      fileStatus: caseData?.fileStatus || "Active",
-      dateOfLoss: caseData?.dateOfLoss || "",
-      openDate: caseData?.openDate || "",
-      referredById: caseData?.referredById || "",
-      clerkAssigned: caseData?.clerkAssigned || "",
-      secretary: caseData?.secretary || "",
-      limitationDate: caseData?.limitationDate || "",
-      mediationStatus: caseData?.mediationStatus || "",
-      arbitrationStatus: caseData?.arbitrationStatus || "",
-      mvaClientFault: caseData?.mvaClientFault || "No",
-      thirdPartyLawyer: caseData?.thirdPartyLawyer || "",
-      tortFileNo: caseData?.tortFileNo || "",
-      benefitsClaiming: caseData?.benefitsClaiming || "No",
-      irbNonEarnerDue: caseData?.irbNonEarnerDue || "No",
-      clientInitials: caseData?.clientInitials || "",
-      clientStreet: caseData?.clientStreet || "",
-      clientCity: caseData?.clientCity || "",
-      clientState: caseData?.clientState || "",
-      clientZip: caseData?.clientZip || "",
-      clientCountry: caseData?.clientCountry || "Canada",
-      clientMobile: caseData?.clientMobile || "",
-    },
-  });
+  const [caseData, setCaseData] = useState<any>(null);
+  const [loading, setLoading] = useState(true);
 
-  if (!caseData) {
-    return <AppLayout title="Case Not Found"><p>Case not found.</p></AppLayout>;
+  useEffect(() => {
+    if (!caseId) return;
+    casesApi.getById(caseId)
+      .then(setCaseData)
+      .catch(console.error)
+      .finally(() => setLoading(false));
+  }, [caseId]);
+
+  function reload() {
+    if (!caseId) return;
+    casesApi.getById(caseId).then(setCaseData).catch(console.error);
   }
 
-  const limDays = daysUntil(caseData.limitationDate);
-  const TabComponent = tabComponents[activeTab] || NotesTab;
-
-  const filteredReferrers = referrers.filter((r) =>
-    r.name.toLowerCase().includes(referrerSearch.toLowerCase())
-  );
-
-  const onSave = () => {
-    setSaving(true);
-    setTimeout(() => {
-      toast({ title: "Case Updated", description: `${caseData.fileNo} saved successfully.` });
-      setSaving(false);
-      setEditing(false);
-    }, 600);
-  };
-
-  const onCancel = () => {
-    reset();
-    setEditing(false);
-  };
-
-  const handleSignatureUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (file) {
-      const reader = new FileReader();
-      reader.onloadend = () => setSignatureUrl(reader.result as string);
-      reader.readAsDataURL(file);
+  function renderTab() {
+    if (!caseId) return null;
+    const props = { caseId, caseData, onUpdate: reload };
+    switch (activeTab) {
+      case "notes":            return <NotesTab caseId={caseId} />;
+      case "activities":       return <ActivitiesTab caseId={caseId} />;
+      case "history":          return <HistoryTab caseId={caseId} />;
+      case "status":           return <StatusTab {...props} />;
+      case "initial-interview":return <InitialInterviewTab caseId={caseId} />;
+      case "client-info":      return <ClientInfoTab caseId={caseId} />;
+      case "no-fault":         return <NoFaultTab caseId={caseId} />;
+      case "third-party":      return <ThirdPartyTab caseId={caseId} />;
+      case "employment":       return <EmploymentTab caseId={caseId} />;
+      case "medical":          return <MedicalTab caseId={caseId} />;
+      case "police-info":      return <PoliceInfoTab caseId={caseId} />;
+      case "lawyers":          return <LawyersTab caseId={caseId} />;
+      case "specialist":       return <SpecialistTab caseId={caseId} />;
+      case "settlement":       return <SettlementTab caseId={caseId} />;
+      case "contact-access":   return <ContactAccessTab caseId={caseId} />;
+      case "documents":        return <DocumentsTab caseId={caseId} />;
+      case "ocf-forms":        return <OcfFormsTab caseId={caseId} />;
+      default:                 return <NotesTab caseId={caseId} />;
     }
-  };
+  }
+
+  const limDays = caseData?.limitationDate ? daysUntil(caseData.limitationDate) : null;
+  const limUrgent = limDays !== null && limDays <= 7 && limDays >= 0;
+  const limWarn = limDays !== null && limDays <= 30 && limDays > 7;
 
   return (
-    <AppLayout title={`Case: ${caseData.fileNo}`}>
-      {/* Header Card */}
-      <Card className="mb-4">
-        <CardContent className="p-4">
-          {!editing ? (
-            <div className="flex items-start justify-between">
+    <AppLayout title={loading ? "Loading..." : `${caseData?.client?.firstName || ""} ${caseData?.client?.lastName || ""}`}>
+      {/* Back button */}
+      <Button variant="ghost" size="sm" className="mb-3 -ml-2" onClick={() => navigate("/clients")}>
+        <ChevronLeft className="h-4 w-4 mr-1" /> Back to Clients
+      </Button>
+
+      {loading ? (
+        <div className="h-32 flex items-center justify-center text-muted-foreground text-sm">Loading case...</div>
+      ) : !caseData ? (
+        <div className="h-32 flex items-center justify-center text-muted-foreground text-sm">Case not found.</div>
+      ) : (
+        <>
+          {/* Case header */}
+          <div className="bg-white border rounded-lg p-4 mb-4">
+            <div className="flex flex-wrap items-start gap-4 justify-between">
               <div>
-                <h2 className="text-xl font-bold">{caseData.client.firstName} {caseData.client.lastName}</h2>
-                <div className="flex flex-wrap items-center gap-2 mt-2 text-sm text-muted-foreground">
-                  <span className="font-medium text-foreground">{caseData.fileNo}</span>
-                  <Badge className={cn("text-xs", statusColor[caseData.fileStatus] || "bg-secondary")}>{caseData.fileStatus}</Badge>
-                  <span>DOL: {formatDate(caseData.dateOfLoss)}</span>
-                  <span className={cn(
-                    limDays <= 7 && limDays >= 0 ? "text-destructive font-semibold" :
-                    limDays <= 30 && limDays > 7 ? "text-orange-500" : ""
-                  )}>
-                    Limitation: {formatDate(caseData.limitationDate)}
+                <div className="flex items-center gap-2 mb-1">
+                  <h2 className="text-lg font-bold text-foreground">
+                    {caseData.client?.firstName} {caseData.client?.lastName}
+                    {caseData.clientInitials && <span className="text-muted-foreground font-normal text-sm ml-1">({caseData.clientInitials})</span>}
+                  </h2>
+                  <Badge className={cn("text-xs", statusColor[caseData.fileStatus])}>{caseData.fileStatus}</Badge>
+                </div>
+                <div className="flex flex-wrap gap-x-5 gap-y-1 text-sm text-muted-foreground">
+                  <span><span className="font-medium text-foreground">File No:</span> {caseData.fileNo}</span>
+                  <span><span className="font-medium text-foreground">Date of Loss:</span> {formatDate(caseData.dateOfLoss)}</span>
+                  <span className={cn(limUrgent ? "text-destructive font-semibold" : limWarn ? "text-orange-500" : "")}>
+                    <span className="font-medium text-foreground">Limitation:</span> {formatDate(caseData.limitationDate)}
+                    {limDays !== null && limDays >= 0 && <span className="ml-1 text-xs">({limDays}d)</span>}
                   </span>
                 </div>
-                <div className="flex flex-wrap gap-4 mt-1 text-xs text-muted-foreground">
-                  <span>Clerk: {caseData.clerkAssigned}</span>
-                  <span>Secretary: {caseData.secretary}</span>
-                  <span>Referred: {caseData.referredBy}</span>
-                  {caseData.clientInitials && <span>Initials: {caseData.clientInitials}</span>}
-                </div>
-                {caseData.clientStreet && (
-                  <p className="text-xs text-muted-foreground mt-1">
-                    Address: {caseData.clientStreet}, {caseData.clientCity}, {caseData.clientState} {caseData.clientZip}, {caseData.clientCountry}
-                  </p>
-                )}
-                {caseData.clientMobile && (
-                  <p className="text-xs text-muted-foreground mt-1 flex items-center gap-1">
-                    <Phone className="h-3 w-3" />
-                    <span>Mobile:</span>
-                    <a href={getMobileTelUri(caseData.clientMobile)} className="hover:underline text-foreground">
-                      {formatMobileNumber(caseData.clientMobile)}
-                    </a>
-                  </p>
-                )}
-              </div>
-              <Button variant="outline" size="sm" onClick={() => setEditing(true)}>
-                <Pencil className="h-3.5 w-3.5 mr-1" /> Edit
-              </Button>
-            </div>
-          ) : (
-            <form onSubmit={handleSubmit(onSave)}>
-              <div className="flex items-center justify-between mb-4">
-                <h2 className="text-lg font-bold">Edit Case Details</h2>
-                <div className="flex gap-2">
-                  <Button type="button" variant="outline" size="sm" onClick={onCancel}>
-                    <X className="h-3.5 w-3.5 mr-1" /> Cancel
-                  </Button>
-                  <Button type="submit" size="sm" disabled={saving}>
-                    <Save className="h-3.5 w-3.5 mr-1" /> {saving ? "Saving..." : "Save"}
-                  </Button>
+                <div className="flex flex-wrap gap-x-5 gap-y-1 text-sm text-muted-foreground mt-1">
+                  <span><span className="font-medium text-foreground">Clerk:</span> {caseData.clerkAssigned || "—"}</span>
+                  <span><span className="font-medium text-foreground">Secretary:</span> {caseData.secretary || "—"}</span>
+                  <span><span className="font-medium text-foreground">Referred By:</span> {caseData.referredBy || "—"}</span>
                 </div>
               </div>
-
-              {/* Section: File Info */}
-              <div className="bg-muted/50 px-3 py-1.5 rounded text-xs font-semibold text-foreground mb-3">File Information</div>
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3 mb-4">
-                <div><Label className="text-xs">File No</Label><Input {...register("fileNo")} className="h-8 text-xs mt-1" /></div>
-                <div>
-                  <Label className="text-xs">File Status</Label>
-                  <Controller name="fileStatus" control={control} render={({ field }) => (
-                    <Select value={field.value} onValueChange={field.onChange}>
-                      <SelectTrigger className="h-8 text-xs mt-1"><SelectValue /></SelectTrigger>
-                      <SelectContent>{FILE_STATUSES.map((s) => <SelectItem key={s} value={s}>{s}</SelectItem>)}</SelectContent>
-                    </Select>
-                  )} />
-                </div>
-                <div><Label className="text-xs">Date of Loss</Label><Input {...register("dateOfLoss")} type="date" className="h-8 text-xs mt-1" /></div>
-                <div><Label className="text-xs">Open Date</Label><Input {...register("openDate")} type="date" className="h-8 text-xs mt-1" /></div>
-              </div>
-
-              {/* Section: Assignment */}
-              <div className="bg-muted/50 px-3 py-1.5 rounded text-xs font-semibold text-foreground mb-3">Assignment</div>
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3 mb-4">
-                {/* Referred By - Searchable Dropdown */}
-                <div>
-                  <Label className="text-xs">Referred By</Label>
-                  <Controller name="referredById" control={control} render={({ field }) => (
-                    <Select value={field.value} onValueChange={field.onChange}>
-                      <SelectTrigger className="h-8 text-xs mt-1"><SelectValue placeholder="Select referrer..." /></SelectTrigger>
-                      <SelectContent>
-                        <div className="px-2 pb-2">
-                          <Input
-                            placeholder="Search referrers..."
-                            value={referrerSearch}
-                            onChange={(e) => setReferrerSearch(e.target.value)}
-                            className="h-7 text-xs"
-                            onClick={(e) => e.stopPropagation()}
-                          />
-                        </div>
-                        {filteredReferrers.map((r) => (
-                          <SelectItem key={r.id} value={r.id}>
-                            <span>{r.name}</span>
-                            <span className="ml-2 text-muted-foreground text-xs">({r.type})</span>
-                          </SelectItem>
-                        ))}
-                        {filteredReferrers.length === 0 && (
-                          <p className="text-xs text-muted-foreground py-2 text-center">No referrers found</p>
-                        )}
-                      </SelectContent>
-                    </Select>
-                  )} />
-                </div>
-                <div><Label className="text-xs">Clerk Assigned</Label><Input {...register("clerkAssigned")} className="h-8 text-xs mt-1" /></div>
-                <div><Label className="text-xs">Secretary</Label><Input {...register("secretary")} className="h-8 text-xs mt-1" /></div>
-              </div>
-
-              {/* Section: Legal */}
-              <div className="bg-muted/50 px-3 py-1.5 rounded text-xs font-semibold text-foreground mb-3">Legal Tracking</div>
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3 mb-4">
-                <div><Label className="text-xs">Limitation Date</Label><Input {...register("limitationDate")} type="date" className="h-8 text-xs mt-1" /></div>
-                <div><Label className="text-xs">Mediation Status</Label><Input {...register("mediationStatus")} className="h-8 text-xs mt-1" /></div>
-                <div><Label className="text-xs">Arbitration Status</Label><Input {...register("arbitrationStatus")} className="h-8 text-xs mt-1" /></div>
-                <div>
-                  <Label className="text-xs">MVA Client Fault?</Label>
-                  <Controller name="mvaClientFault" control={control} render={({ field }) => (
-                    <Select value={field.value} onValueChange={field.onChange}>
-                      <SelectTrigger className="h-8 text-xs mt-1"><SelectValue /></SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="Yes">Yes</SelectItem>
-                        <SelectItem value="No">No</SelectItem>
-                        <SelectItem value="Unknown">Unknown</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  )} />
-                </div>
-                <div><Label className="text-xs">Third Party Lawyer</Label><Input {...register("thirdPartyLawyer")} className="h-8 text-xs mt-1" /></div>
-                <div><Label className="text-xs">Tort File No</Label><Input {...register("tortFileNo")} className="h-8 text-xs mt-1" /></div>
-              </div>
-
-              {/* Section: Client Address */}
-              <div className="bg-muted/50 px-3 py-1.5 rounded text-xs font-semibold text-foreground mb-3">Client Address</div>
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3 mb-4">
-                <div className="lg:col-span-2"><Label className="text-xs">Street Address</Label><Input {...register("clientStreet")} className="h-8 text-xs mt-1" /></div>
-                <div><Label className="text-xs">City</Label><Input {...register("clientCity")} className="h-8 text-xs mt-1" /></div>
-                <div>
-                  <Label className="text-xs">State/Province</Label>
-                  <Controller name="clientState" control={control} render={({ field }) => (
-                    <Select value={field.value} onValueChange={field.onChange}>
-                      <SelectTrigger className="h-8 text-xs mt-1"><SelectValue /></SelectTrigger>
-                      <SelectContent>{PROVINCES.map((p) => <SelectItem key={p} value={p}>{p}</SelectItem>)}</SelectContent>
-                    </Select>
-                  )} />
-                </div>
-                <div><Label className="text-xs">ZIP/Postal Code</Label><Input {...register("clientZip")} className="h-8 text-xs mt-1" /></div>
-                <div><Label className="text-xs">Country</Label><Input {...register("clientCountry")} className="h-8 text-xs mt-1" /></div>
-                <div>
-                  <Label className="text-xs">Mobile Number</Label>
-                  <div className="flex items-center gap-1 mt-1">
-                    <Phone className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
-                    <Input
-                      {...register("clientMobile", {
-                        validate: (v) => validateMobileNumber(v || ""),
-                        onChange: (e) => {
-                          const result = validateMobileNumber(e.target.value);
-                          setMobileError(result === true ? "" : result);
-                        }
-                      })}
-                      placeholder="+1-XXX-XXX-XXXX"
-                      className="h-8 text-xs"
-                    />
-                  </div>
-                  {mobileError && <p className="text-xs text-destructive mt-1">{mobileError}</p>}
-                </div>
-              </div>
-
-              {/* Section: Client Initials */}
-              <div className="bg-muted/50 px-3 py-1.5 rounded text-xs font-semibold text-foreground mb-3">Client Identification</div>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mb-4">
-                <div>
-                  <Label className="text-xs">Client Initials (2-3 chars)</Label>
-                  <Input {...register("clientInitials")} maxLength={3} className="h-8 text-xs mt-1 w-24 uppercase" placeholder="e.g. JM" />
-                </div>
-              </div>
-
-              {/* Section: Digital Signature */}
-              <div className="bg-muted/50 px-3 py-1.5 rounded text-xs font-semibold text-foreground mb-3">Client Digital Signature</div>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
-                <div>
-                  <Label className="text-xs mb-2 block">Draw Signature</Label>
-                  <SignaturePad value={signatureUrl} onChange={setSignatureUrl} />
-                </div>
-                <div>
-                  <Label className="text-xs mb-2 block">Or Upload Signature Image</Label>
-                  <div className="border-2 border-dashed border-border rounded-md p-4 text-center">
-                    <Upload className="h-6 w-6 mx-auto text-muted-foreground mb-2" />
-                    <Input type="file" accept="image/*" onChange={handleSignatureUpload} className="h-8 text-xs" />
-                    <p className="text-xs text-muted-foreground mt-1">PNG, JPG up to 2MB</p>
-                  </div>
-                  {signatureUrl && (
-                    <div className="mt-2 border rounded-md p-2">
-                      <Label className="text-xs text-muted-foreground">Current Signature:</Label>
-                      <img src={signatureUrl} alt="Signature" className="max-h-16 mt-1" />
-                    </div>
-                  )}
-                </div>
-              </div>
-            </form>
-          )}
-        </CardContent>
-      </Card>
-
-      {/* Tab Navigation */}
-      <div className="mb-4 overflow-x-auto scrollbar-thin">
-        <div className="flex gap-0.5 min-w-max border-b">
-          {TABS.map((t) => (
-            <button
-              key={t.key}
-              onClick={() => navigate(`/cases/${caseId}/${t.key}`)}
-              className={cn(
-                "px-3 py-2 text-xs font-medium whitespace-nowrap border-b-2 transition-colors",
-                activeTab === t.key
-                  ? "border-primary text-primary"
-                  : "border-transparent text-muted-foreground hover:text-foreground hover:border-border"
+              {(caseData.clientMobile || caseData.client?.cellPhone) && (
+                <a
+                  href={getMobileTelUri(caseData.clientMobile || caseData.client?.cellPhone)}
+                  className="flex items-center gap-1 text-primary text-sm hover:underline"
+                >
+                  <Phone className="h-3.5 w-3.5" />
+                  {formatMobileNumber(caseData.clientMobile || caseData.client?.cellPhone)}
+                </a>
               )}
-            >
-              {t.label}
-            </button>
-          ))}
-        </div>
-      </div>
+            </div>
+          </div>
 
-      <TabComponent caseId={caseId || "1"} />
+          {/* Tab navigation */}
+          <div className="flex overflow-x-auto gap-0 border-b mb-0 pb-0 -mb-px scrollbar-hide">
+            {TABS.map((t) => (
+              <button
+                key={t.id}
+                onClick={() => navigate(`/cases/${caseId}/${t.id}`)}
+                className={cn(
+                  "px-3 py-2 text-xs font-medium whitespace-nowrap border-b-2 -mb-px transition-colors shrink-0",
+                  activeTab === t.id
+                    ? "border-primary text-primary"
+                    : "border-transparent text-muted-foreground hover:text-foreground hover:border-muted"
+                )}
+              >
+                {t.label}
+              </button>
+            ))}
+          </div>
+
+          {/* Tab content */}
+          <div className="bg-white border border-t-0 rounded-b-lg min-h-[400px]">
+            {renderTab()}
+          </div>
+        </>
+      )}
     </AppLayout>
   );
 }
