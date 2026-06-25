@@ -1,66 +1,107 @@
-import { useState, useEffect } from "react";
+import { useForm } from "react-hook-form";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
-
-const API = "http://localhost:5000/api";
-const token = () => localStorage.getItem("crm_token") || "";
-
-const F = ({ label, value, onChange }: any) => (
-  <div>
-    <Label className="text-xs">{label}</Label>
-    <Input value={value || ""} onChange={e => onChange(e.target.value)} className="mt-1 h-9 text-sm" />
-  </div>
-);
+import { useState, useEffect } from "react";
+import { API_BASE_URL } from "@/lib/constants";
 
 export default function PoliceInfoTab({ caseId }: { caseId: string }) {
   const { toast } = useToast();
-  const [saving, setSaving] = useState(false);
-  const [d, setD] = useState<any>({});
-  const s = (k: string) => (v: string) => setD((p: any) => ({ ...p, [k]: v }));
+  const [loading, setLoading] = useState(false);
+  const [fetching, setFetching] = useState(true);
+  const { register, handleSubmit, watch, setValue, reset } = useForm({
+    defaultValues: {
+      reportedDate: "No", reportOrdered: "No", reportOrderedDate: "",
+      policeCentre: "", policeOfficer: "", badgeNumber: "",
+      incidentNo: "", division: "", address: "",
+      city: "", provincePC: "",
+      requestDate: "", receivedDate: "",
+      phone: "", intersection: "", timeOfAccident: "",
+      accidentDescription: "",
+    },
+  });
 
   useEffect(() => {
-    fetch(`${API}/cases/${caseId}/police-info`, { headers: { Authorization: `Bearer ${token()}` } })
-      .then(r => r.ok ? r.json() : null).then(r => { if (r) setD(r); });
+    const token = localStorage.getItem("token");
+    fetch(`${API_BASE_URL}/cases/${caseId}/police-info`, {
+      headers: { Authorization: `Bearer ${token}` },
+    })
+      .then((r) => r.json())
+      .then((data) => { reset(data); })
+      .catch(() => toast({ title: "Failed to load police info", variant: "destructive" }))
+      .finally(() => setFetching(false));
   }, [caseId]);
 
-  async function save() {
-    setSaving(true);
+  const onSubmit = async (data: any) => {
+    setLoading(true);
     try {
-      const r = await fetch(`${API}/cases/${caseId}/police-info`, { method: "POST", headers: { "Content-Type": "application/json", Authorization: `Bearer ${token()}` }, body: JSON.stringify(d) });
-      if (!r.ok) throw new Error();
-      toast({ title: "Saved" });
-    } catch { toast({ title: "Save failed", variant: "destructive" }); }
-    finally { setSaving(false); }
-  }
+      const token = localStorage.getItem("token");
+      const res = await fetch(`${API_BASE_URL}/cases/${caseId}/police-info`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+        body: JSON.stringify(data),
+      });
+      if (!res.ok) throw new Error();
+      toast({ title: "Police Info Saved" });
+    } catch {
+      toast({ title: "Save failed", variant: "destructive" });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const F = ({ label, name, type = "text" }: { label: string; name: string; type?: string }) => (
+    <div><Label className="text-xs">{label}</Label><Input {...register(name as any)} type={type} className="h-8 text-xs mt-1" /></div>
+  );
+
+  if (fetching) return <div className="p-6 text-sm text-muted-foreground">Loading...</div>;
 
   return (
-    <div className="p-4 space-y-4">
+    <form onSubmit={handleSubmit(onSubmit)}>
       <Card>
-        <CardHeader className="pb-2"><CardTitle className="text-sm">Police Report Information</CardTitle></CardHeader>
-        <CardContent className="grid grid-cols-2 gap-3">
-          <F label="Police Department / Centre" value={d.policeCentre} onChange={s("policeCentre")} />
-          <F label="Officer Name" value={d.officerName} onChange={s("officerName")} />
-          <F label="Badge Number" value={d.badgeNumber} onChange={s("badgeNumber")} />
-          <F label="Incident / Report No." value={d.incidentNo} onChange={s("incidentNo")} />
-          <F label="Report Date" value={d.reportDate} onChange={s("reportDate")} />
-          <F label="Division" value={d.division} onChange={s("division")} />
-          <F label="Station Address" value={d.stationAddress} onChange={s("stationAddress")} />
-          <F label="City" value={d.city} onChange={s("city")} />
-          <F label="Phone" value={d.phone} onChange={s("phone")} />
-          <F label="Date Report Requested" value={d.requestDate} onChange={s("requestDate")} />
-          <F label="Date Report Received" value={d.receivedDate} onChange={s("receivedDate")} />
-          <F label="Report Ordered" value={d.reportOrdered} onChange={s("reportOrdered")} />
-          <div className="col-span-2">
-            <Label className="text-xs">Notes</Label>
-            <Textarea value={d.notes || ""} onChange={e => s("notes")(e.target.value)} className="mt-1 text-sm" rows={3} />
+        <CardHeader className="pb-2"><CardTitle className="text-sm">Police Information</CardTitle></CardHeader>
+        <CardContent>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+            <div><Label className="text-xs">Reported Date?</Label>
+              <Select value={watch("reportedDate" as any)} onValueChange={(v) => setValue("reportedDate" as any, v)}>
+                <SelectTrigger className="h-8 text-xs mt-1"><SelectValue /></SelectTrigger>
+                <SelectContent><SelectItem value="Yes">Yes</SelectItem><SelectItem value="No">No</SelectItem></SelectContent>
+              </Select>
+            </div>
+            <div><Label className="text-xs">Report Ordered?</Label>
+              <Select value={watch("reportOrdered" as any)} onValueChange={(v) => setValue("reportOrdered" as any, v)}>
+                <SelectTrigger className="h-8 text-xs mt-1"><SelectValue /></SelectTrigger>
+                <SelectContent><SelectItem value="Yes">Yes</SelectItem><SelectItem value="No">No</SelectItem></SelectContent>
+              </Select>
+            </div>
+            <F label="Report Ordered Date" name="reportOrderedDate" type="date" />
+            <F label="Police/Centre" name="policeCentre" />
+            <F label="Police Officer" name="policeOfficer" />
+            <F label="Badge Number" name="badgeNumber" />
+            <F label="Incident No" name="incidentNo" />
+            <F label="Division" name="division" />
+            <F label="Address" name="address" />
+            <F label="City" name="city" />
+            <F label="Province/PC" name="provincePC" />
+            <F label="Request Date" name="requestDate" type="date" />
+            <F label="Received" name="receivedDate" type="date" />
+            <F label="Phone" name="phone" />
+            <F label="Intersection" name="intersection" />
+            <F label="Time of Accident" name="timeOfAccident" type="time" />
+          </div>
+          <div className="mt-3">
+            <Label className="text-xs">Description of Accident</Label>
+            <Textarea {...register("accidentDescription")} rows={4} className="text-xs mt-1" />
           </div>
         </CardContent>
       </Card>
-      <div className="flex justify-end"><Button onClick={save} disabled={saving}>{saving ? "Saving..." : "Save"}</Button></div>
-    </div>
+      <div className="flex justify-end mt-4">
+        <Button type="submit" disabled={loading}>{loading ? "Saving..." : "Save Police Info"}</Button>
+      </div>
+    </form>
   );
 }

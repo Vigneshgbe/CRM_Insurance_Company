@@ -1,59 +1,84 @@
-import { useState, useEffect } from "react";
+import { useForm } from "react-hook-form";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Textarea } from "@/components/ui/textarea";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
-
-const API = "http://localhost:5000/api";
-const token = () => localStorage.getItem("crm_token") || "";
-const F = ({ label, value, onChange }: any) => (
-  <div><Label className="text-xs">{label}</Label><Input value={value || ""} onChange={e => onChange(e.target.value)} className="mt-1 h-9 text-sm" /></div>
-);
+import { useState, useEffect } from "react";
+import { ASSESSMENT_COMPANIES, PROVINCES, API_BASE_URL } from "@/lib/constants";
 
 export default function SpecialistTab({ caseId }: { caseId: string }) {
   const { toast } = useToast();
-  const [saving, setSaving] = useState(false);
-  const [d, setD] = useState<any>({});
-  const s = (k: string) => (v: string) => setD((p: any) => ({ ...p, [k]: v }));
+  const [loading, setLoading] = useState(false);
+  const [fetching, setFetching] = useState(true);
+  const { register, handleSubmit, watch, setValue, reset } = useForm({
+    defaultValues: {
+      company: "", address: "", city: "",
+      province: "Ontario", postCode: "", phone: "", fax: "",
+    },
+  });
 
   useEffect(() => {
-    fetch(`${API}/cases/${caseId}/specialist`, { headers: { Authorization: `Bearer ${token()}` } })
-      .then(r => r.ok ? r.json() : null).then(r => { if (r) setD(r); });
+    const token = localStorage.getItem("token");
+    fetch(`${API_BASE_URL}/cases/${caseId}/specialist`, {
+      headers: { Authorization: `Bearer ${token}` },
+    })
+      .then((r) => r.json())
+      .then((data) => { reset(data); })
+      .catch(() => toast({ title: "Failed to load specialist data", variant: "destructive" }))
+      .finally(() => setFetching(false));
   }, [caseId]);
 
-  async function save() {
-    setSaving(true);
+  const onSubmit = async (data: any) => {
+    setLoading(true);
     try {
-      const r = await fetch(`${API}/cases/${caseId}/specialist`, { method: "POST", headers: { "Content-Type": "application/json", Authorization: `Bearer ${token()}` }, body: JSON.stringify(d) });
-      if (!r.ok) throw new Error();
-      toast({ title: "Saved" });
-    } catch { toast({ title: "Save failed", variant: "destructive" }); }
-    finally { setSaving(false); }
-  }
+      const token = localStorage.getItem("token");
+      const res = await fetch(`${API_BASE_URL}/cases/${caseId}/specialist`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+        body: JSON.stringify(data),
+      });
+      if (!res.ok) throw new Error();
+      toast({ title: "Specialist Info Saved" });
+    } catch {
+      toast({ title: "Save failed", variant: "destructive" });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  if (fetching) return <div className="p-6 text-sm text-muted-foreground">Loading...</div>;
 
   return (
-    <div className="p-4 space-y-4">
+    <form onSubmit={handleSubmit(onSubmit)}>
       <Card>
-        <CardHeader className="pb-2"><CardTitle className="text-sm">Specialist / Assessment Centre</CardTitle></CardHeader>
-        <CardContent className="grid grid-cols-2 gap-3">
-          <F label="Company / Centre Name" value={d.company} onChange={s("company")} />
-          <F label="Specialist Name" value={d.specialistName} onChange={s("specialistName")} />
-          <F label="Address" value={d.address} onChange={s("address")} />
-          <F label="City" value={d.city} onChange={s("city")} />
-          <F label="Phone" value={d.phone} onChange={s("phone")} />
-          <F label="Fax" value={d.fax} onChange={s("fax")} />
-          <F label="Specialty Type" value={d.specialtyType} onChange={s("specialtyType")} />
-          <F label="Assessment Date" value={d.assessmentDate} onChange={s("assessmentDate")} />
-          <F label="Report Date" value={d.reportDate} onChange={s("reportDate")} />
-          <div className="col-span-2">
-            <Label className="text-xs">Findings</Label>
-            <Textarea value={d.findings || ""} onChange={e => s("findings")(e.target.value)} className="mt-1 text-sm" rows={3} />
+        <CardHeader className="pb-2"><CardTitle className="text-sm">Specialist / Assessment Company</CardTitle></CardHeader>
+        <CardContent>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-3 max-w-3xl">
+            <div><Label className="text-xs">Assessment Company</Label>
+              <Select value={watch("company")} onValueChange={(v) => setValue("company", v)}>
+                <SelectTrigger className="h-8 text-xs mt-1"><SelectValue /></SelectTrigger>
+                <SelectContent>{ASSESSMENT_COMPANIES.map((c) => <SelectItem key={c} value={c}>{c}</SelectItem>)}</SelectContent>
+              </Select>
+            </div>
+            <div><Label className="text-xs">Address</Label><Input {...register("address")} className="h-8 text-xs mt-1" /></div>
+            <div><Label className="text-xs">City</Label><Input {...register("city")} className="h-8 text-xs mt-1" /></div>
+            <div><Label className="text-xs">Province</Label>
+              <Select value={watch("province")} onValueChange={(v) => setValue("province", v)}>
+                <SelectTrigger className="h-8 text-xs mt-1"><SelectValue /></SelectTrigger>
+                <SelectContent>{PROVINCES.map((p) => <SelectItem key={p} value={p}>{p}</SelectItem>)}</SelectContent>
+              </Select>
+            </div>
+            <div><Label className="text-xs">Post Code</Label><Input {...register("postCode")} className="h-8 text-xs mt-1" /></div>
+            <div><Label className="text-xs">Phone</Label><Input {...register("phone")} className="h-8 text-xs mt-1" /></div>
+            <div><Label className="text-xs">Fax</Label><Input {...register("fax")} className="h-8 text-xs mt-1" /></div>
           </div>
         </CardContent>
       </Card>
-      <div className="flex justify-end"><Button onClick={save} disabled={saving}>{saving ? "Saving..." : "Save"}</Button></div>
-    </div>
+      <div className="flex justify-end mt-4">
+        <Button type="submit" disabled={loading}>{loading ? "Saving..." : "Save Specialist Info"}</Button>
+      </div>
+    </form>
   );
 }

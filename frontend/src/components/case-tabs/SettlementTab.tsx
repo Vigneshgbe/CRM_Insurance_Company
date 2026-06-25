@@ -1,93 +1,136 @@
-import { useState, useEffect } from "react";
+import { useForm } from "react-hook-form";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
+import { useState, useEffect } from "react";
 import { formatCurrency } from "@/lib/formatters";
-
-const API = "http://localhost:5000/api";
-const token = () => localStorage.getItem("crm_token") || "";
-
-const empty = { finalSettlement:0, ourFee:0, rehabOutstanding:0, assessmentOutstanding:0, outstanding3:0, outstanding4:0, hst:0, ourFeeHst:0, payToClient:0, ourFinalAccount:0 };
+import { cn } from "@/lib/utils";
+import { API_BASE_URL } from "@/lib/constants";
 
 export default function SettlementTab({ caseId }: { caseId: string }) {
   const { toast } = useToast();
-  const [d, setD] = useState<any>(empty);
-  const [saving, setSaving] = useState(false);
+  const [loading, setLoading] = useState(false);
+  const [fetching, setFetching] = useState(true);
+  const { register, handleSubmit, watch, setValue, reset } = useForm({
+    defaultValues: {
+      finalSettlement: "0", ourFee: "0", rehabOutstanding: "0",
+      assessmentOutstanding: "0", outstanding3: "0", outstanding4: "0",
+      hst: "0", ourFeeHst: "0", payToClient: "0", ourFinalAccount: "0",
+    },
+  });
 
   useEffect(() => {
-    fetch(`${API}/cases/${caseId}/settlement`, { headers: { Authorization: `Bearer ${token()}` } })
-      .then(r => r.ok ? r.json() : null).then(r => { if (r) setD(r); });
+    const token = localStorage.getItem("token");
+    fetch(`${API_BASE_URL}/cases/${caseId}/settlement`, {
+      headers: { Authorization: `Bearer ${token}` },
+    })
+      .then((r) => r.json())
+      .then((data) => { reset(data); })
+      .catch(() => toast({ title: "Failed to load settlement data", variant: "destructive" }))
+      .finally(() => setFetching(false));
   }, [caseId]);
 
-  const n = (v: any) => parseFloat(v) || 0;
+  const values = watch();
+  const fs       = Number(values.finalSettlement)      || 0;
+  const fee      = Number(values.ourFee)               || 0;
+  const rehab    = Number(values.rehabOutstanding)      || 0;
+  const assess   = Number(values.assessmentOutstanding) || 0;
+  const o3       = Number(values.outstanding3)          || 0;
+  const o4       = Number(values.outstanding4)          || 0;
+  const hst      = Number(values.hst)                  || 0;
+  const feeHst   = Number(values.ourFeeHst)            || 0;
 
-  function update(k: string, v: string) {
-    setD((prev: any) => {
-      const next = { ...prev, [k]: parseFloat(v) || 0 };
-      const deductions = n(next.ourFee) + n(next.rehabOutstanding) + n(next.assessmentOutstanding) + n(next.outstanding3) + n(next.outstanding4) + n(next.hst) + n(next.ourFeeHst);
-      next.payToClient = Math.max(0, n(next.finalSettlement) - deductions);
-      next.ourFinalAccount = n(next.ourFee) + n(next.ourFeeHst);
-      return next;
-    });
-  }
+  const totalDeductions = fee + rehab + assess + o3 + o4 + hst + feeHst;
+  const payToClient     = fs - totalDeductions;
+  const finalAccount    = fee + feeHst;
 
-  async function save() {
-    setSaving(true);
+  useEffect(() => {
+    setValue("payToClient",    payToClient);
+    setValue("ourFinalAccount", finalAccount);
+  }, [payToClient, finalAccount, setValue]);
+
+  const onSubmit = async (data: any) => {
+    setLoading(true);
     try {
-      const r = await fetch(`${API}/cases/${caseId}/settlement`, {
-        method: "POST", headers: { "Content-Type": "application/json", Authorization: `Bearer ${token()}` },
-        body: JSON.stringify(d),
+      const token = localStorage.getItem("token");
+      const payload = { ...data, payToClient, ourFinalAccount: finalAccount };
+      const res = await fetch(`${API_BASE_URL}/cases/${caseId}/settlement`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+        body: JSON.stringify(payload),
       });
-      if (!r.ok) throw new Error();
-      toast({ title: "Settlement saved" });
-    } catch { toast({ title: "Save failed", variant: "destructive" }); }
-    finally { setSaving(false); }
-  }
+      if (!res.ok) throw new Error();
+      toast({ title: "Settlement Saved" });
+    } catch {
+      toast({ title: "Save failed", variant: "destructive" });
+    } finally {
+      setLoading(false);
+    }
+  };
 
-  const Field = ({ label, field, readOnly }: { label: string; field: string; readOnly?: boolean }) => (
-    <div>
-      <Label className="text-xs">{label}</Label>
-      <Input
-        type="number" step="0.01" min="0"
-        value={d[field] || 0}
-        onChange={e => update(field, e.target.value)}
-        readOnly={readOnly}
-        className={`mt-1 h-9 text-sm ${readOnly ? "bg-muted font-medium" : ""}`}
-      />
+  const F = ({ label, name, readOnly = false, highlight = false }: { label: string; name: string; readOnly?: boolean; highlight?: boolean }) => (
+    <div className={cn(highlight ? "p-3 rounded-lg bg-green-50 border border-green-200" : "")}>
+      <Label className={cn("text-xs", highlight ? "text-green-700 font-semibold" : "")}>{label}</Label>
+      <div className="relative mt-1">
+        <span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-xs text-muted-foreground">$</span>
+        <Input
+          {...register(name as any)}
+          type="number"
+          className={cn("h-9 text-sm pl-6", readOnly ? "bg-muted" : "", highlight ? "text-green-700 font-bold text-base bg-green-50 border-green-300" : "")}
+          readOnly={readOnly}
+        />
+      </div>
     </div>
   );
 
+  if (fetching) return <div className="p-6 text-sm text-muted-foreground">Loading...</div>;
+
   return (
-    <div className="p-4 space-y-4">
+    <form onSubmit={handleSubmit(onSubmit)}>
       <Card>
-        <CardHeader className="pb-2"><CardTitle className="text-sm">Settlement Amounts</CardTitle></CardHeader>
-        <CardContent className="grid grid-cols-2 gap-3">
-          <Field label="Final Settlement" field="finalSettlement" />
-          <Field label="Our Fee" field="ourFee" />
-          <Field label="Rehab Outstanding" field="rehabOutstanding" />
-          <Field label="Assessment Outstanding" field="assessmentOutstanding" />
-          <Field label="Other Outstanding 1" field="outstanding3" />
-          <Field label="Other Outstanding 2" field="outstanding4" />
-          <Field label="HST" field="hst" />
-          <Field label="Our Fee + HST" field="ourFeeHst" />
-        </CardContent>
-      </Card>
-      <Card className="border-primary/30 bg-primary/5">
-        <CardHeader className="pb-2"><CardTitle className="text-sm text-primary">Calculated Totals</CardTitle></CardHeader>
-        <CardContent className="grid grid-cols-2 gap-3">
-          <div>
-            <Label className="text-xs text-muted-foreground">Pay to Client</Label>
-            <p className="text-lg font-bold text-primary mt-1">{formatCurrency(d.payToClient)}</p>
-          </div>
-          <div>
-            <Label className="text-xs text-muted-foreground">Our Final Account</Label>
-            <p className="text-lg font-bold text-primary mt-1">{formatCurrency(d.ourFinalAccount)}</p>
+        <CardHeader className="pb-2"><CardTitle className="text-sm">Settlement Proposal</CardTitle></CardHeader>
+        <CardContent>
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 max-w-4xl">
+            <F label="Final Settlement Amount" name="finalSettlement" />
+            <F label="Our Fee Herein" name="ourFee" />
+            <F label="Rehab Outstanding" name="rehabOutstanding" />
+            <F label="Assessment Outstanding" name="assessmentOutstanding" />
+            <F label="Outstanding-3" name="outstanding3" />
+            <F label="Outstanding-4" name="outstanding4" />
+            <F label="HST" name="hst" />
+            <F label="Our Fee HST" name="ourFeeHst" />
+            <F label="Pay to Client" name="payToClient" readOnly highlight />
+            <F label="Our Final Account Herein" name="ourFinalAccount" readOnly />
           </div>
         </CardContent>
       </Card>
-      <div className="flex justify-end"><Button onClick={save} disabled={saving}>{saving ? "Saving..." : "Save Settlement"}</Button></div>
-    </div>
+
+      <Card className="mt-4">
+        <CardContent className="p-6">
+          <h3 className="text-sm font-semibold mb-4">Settlement Summary</h3>
+          <div className="max-w-md space-y-2">
+            <div className="flex justify-between text-sm">
+              <span>Final Settlement:</span>
+              <span className="font-medium">{formatCurrency(fs)}</span>
+            </div>
+            <div className="flex justify-between text-sm">
+              <span>Total Deductions:</span>
+              <span className="font-medium text-destructive">-{formatCurrency(totalDeductions)}</span>
+            </div>
+            <div className="border-t my-2" />
+            <div className="flex justify-between text-lg font-bold text-green-700">
+              <span>Pay to Client:</span>
+              <span>{formatCurrency(payToClient)}</span>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+
+      <div className="sticky bottom-0 bg-background border-t py-3 mt-4 flex justify-end">
+        <Button type="submit" disabled={loading}>{loading ? "Saving..." : "Save Settlement"}</Button>
+      </div>
+    </form>
   );
 }
