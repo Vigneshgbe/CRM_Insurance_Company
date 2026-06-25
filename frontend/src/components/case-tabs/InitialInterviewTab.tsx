@@ -9,8 +9,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { useToast } from "@/hooks/use-toast";
 import { PROVINCES, MARITAL_STATUSES } from "@/lib/constants";
 import { API_BASE_URL } from "@/lib/constants";
-import { Calendar, ListChecks, StickyNote, MessageSquare, Phone, Mail, Users } from "lucide-react";
-import { cn } from "@/lib/utils";
+
 
 // ── Token helper — matches auth.tsx which stores as crm_token ──────────────
 function getToken() {
@@ -42,18 +41,6 @@ function Field({ label, children }: { label: string; children: React.ReactNode }
     </div>
   );
 }
-
-const SIDE_AB = [
-  { id: "contacts", label: "AB Contacts", icon: Users },
-  { id: "calendar", label: "Calendar", icon: Calendar },
-  { id: "tasks", label: "Task List", icon: ListChecks },
-  { id: "notes", label: "Notes", icon: StickyNote },
-  { id: "sms", label: "SMS", icon: MessageSquare },
-  { id: "whatsapp", label: "WhatsApp", icon: Phone },
-  { id: "email", label: "E-mail", icon: Mail },
-];
-
-const SIDE_TORT = [{ id: "contacts", label: "TORT", icon: Users }, ...SIDE_AB.slice(1)];
 
 // ── Default form shape — all fields from both DB and UI ───────────────────
 const defaultForm = {
@@ -121,13 +108,10 @@ const defaultForm = {
 
 export default function InitialInterviewTab({ caseId }: { caseId: string }) {
   const { toast } = useToast();
-  const [activeSide, setActiveSide] = useState("contacts");
   const [fetching, setFetching] = useState(true);
   const [saving, setSaving] = useState(false);
   const [isTort, setIsTort] = useState(false);
   const [form, setForm] = useState({ ...defaultForm });
-
-  const sideItems = isTort ? SIDE_TORT : SIDE_AB;
 
   // ── Load: fetch case + interview data in parallel ──────────────────────
   useEffect(() => {
@@ -288,42 +272,9 @@ export default function InitialInterviewTab({ caseId }: { caseId: string }) {
   }
 
   return (
-    <div className="flex gap-4">
-      {/* Left sub-nav — unchanged from original */}
-      <aside className="w-44 shrink-0 space-y-1.5">
-        {sideItems.map((it) => {
-          const Icon = it.icon;
-          const active = activeSide === it.id;
-          return (
-            <button
-              key={it.id}
-              onClick={() => setActiveSide(it.id)}
-              className={cn(
-                "w-full flex items-center gap-2 px-3 py-2 rounded-md text-xs font-medium border transition-colors",
-                active
-                  ? "bg-orange-500 text-white border-orange-500 hover:bg-orange-600"
-                  : "bg-orange-50 text-orange-700 border-orange-200 hover:bg-orange-100"
-              )}
-            >
-              <Icon className="h-3.5 w-3.5" />
-              {it.label}
-            </button>
-          );
-        })}
-      </aside>
-
-      {/* Main content */}
-      <div className="flex-1 space-y-4">
-        {activeSide !== "contacts" ? (
-          <Card>
-            <CardContent className="p-10 text-center text-sm text-muted-foreground">
-              {sideItems.find((s) => s.id === activeSide)?.label} — Coming soon
-            </CardContent>
-          </Card>
-        ) : (
-          <>
-            {/* Interview Header */}
-            <Card>
+    <div className="space-y-4">
+      {/* Interview Header */}
+      <Card>
               <CardHeader className="pb-2">
                 <CardTitle className="text-sm">{isTort ? "TORT" : "AB"} — Interview Header</CardTitle>
               </CardHeader>
@@ -465,9 +416,6 @@ export default function InitialInterviewTab({ caseId }: { caseId: string }) {
                 {saving ? "Saving..." : "Save Initial Interview"}
               </Button>
             </div>
-          </>
-        )}
-      </div>
     </div>
   );
 }
