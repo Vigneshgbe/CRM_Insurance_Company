@@ -1,247 +1,211 @@
-import { useState, useRef, useEffect } from "react";
-import { AppLayout } from "@/components/layout/AppLayout";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { useEffect, useState, useRef } from "react";
+import { Upload, Search } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Badge } from "@/components/ui/badge";
-import { DOCUMENT_CATEGORY_TREE, type DocumentCategory } from "@/lib/constants";
-import { formatDate } from "@/lib/formatters";
+import { documentsApi } from "@/lib/api";
 import { useToast } from "@/hooks/use-toast";
-import { Upload, Eye, Download, Trash2, Search, ChevronRight, ChevronDown, FolderOpen, File } from "lucide-react";
-import { cases, caseDocuments, getCaseById } from "@/data/mockData";
-import { cn } from "@/lib/utils";
 
-function getAllDocuments() {
-  return caseDocuments.map((d) => {
-    const c = getCaseById(d.caseId);
-    return { ...d, caseFileNo: c?.fileNo || "N/A" };
-  });
-}
+const CATEGORY_TREE = [
+  {
+    name: "Motor Vehicle (MVA)",
+    children: [
+      {
+        name: "AB (Accident Benefits)",
+        children: [
+          { name: "Insurance" },
+          { name: "Medical - Family Doctor" },
+          { name: "Assessment Report" },
+          { name: "Specialist Report", children: [
+            { name: "Neurological" },
+            { name: "Mental Health" },
+            { name: "Orthopedic" },
+            { name: "Other" },
+          ]},
+          { name: "I Report" },
+          { name: "Police Report" },
+          { name: "Other Documents" },
+        ],
+      },
+      { name: "Tort" },
+    ],
+  },
+  { name: "Slip and Fall" },
+  { name: "Traffic Accident" },
+  { name: "Immigration" },
+];
 
-function flattenCategories(cats: DocumentCategory[]): DocumentCategory[] {
-  const result: DocumentCategory[] = [];
-  function walk(list: DocumentCategory[]) {
-    for (const c of list) {
-      result.push(c);
-      if (c.children) walk(c.children);
-    }
+function flatCategories(tree: any[], result: string[] = []): string[] {
+  for (const node of tree) {
+    result.push(node.name);
+    if (node.children) flatCategories(node.children, result);
   }
-  walk(cats);
   return result;
 }
 
-function countDocsInCategory(catId: string, allDocs: ReturnType<typeof getAllDocuments>, allCats: DocumentCategory[]): number {
-  const ids = new Set<string>();
-  function collectIds(cats: DocumentCategory[]) {
-    for (const c of cats) {
-      ids.add(c.id);
-      if (c.children) collectIds(c.children);
-    }
-  }
-  const target = findCat(allCats, catId);
-  if (target) {
-    ids.add(target.id);
-    if (target.children) collectIds(target.children);
-  }
-  return allDocs.filter(d => ids.has(d.category)).length;
+function countDocs(docs: any[], categoryName: string): number {
+  return docs.filter((d) => d.category === categoryName || d.subCategory === categoryName).length;
 }
 
-function findCat(cats: DocumentCategory[], id: string): DocumentCategory | undefined {
-  for (const c of cats) {
-    if (c.id === id) return c;
-    if (c.children) {
-      const found = findCat(c.children, id);
-      if (found) return found;
-    }
-  }
-  return undefined;
-}
-
-function CategoryTreeNode({
-  cat, selectedId, onSelect, allDocs, depth = 0
-}: {
-  cat: DocumentCategory; selectedId: string; onSelect: (id: string) => void; allDocs: ReturnType<typeof getAllDocuments>; depth?: number;
-}) {
-  const [open, setOpen] = useState(depth < 1);
-  const hasChildren = cat.children && cat.children.length > 0;
-  const count = countDocsInCategory(cat.id, allDocs, DOCUMENT_CATEGORY_TREE);
-
+function CategoryNode({ node, docs, selected, onSelect, depth = 0 }: any) {
+  const [open, setOpen] = useState(true);
+  const count = countDocs(docs, node.name);
   return (
     <div>
-      <button
-        onClick={() => { onSelect(cat.id); if (hasChildren) setOpen(!open); }}
-        className={cn(
-          "flex items-center gap-1.5 w-full text-left px-2 py-1.5 rounded text-xs hover:bg-muted/80 transition-colors",
-          selectedId === cat.id && "bg-primary/10 text-primary font-medium"
-        )}
-        style={{ paddingLeft: `${depth * 16 + 8}px` }}
+      <div
+        className={`flex items-center justify-between px-2 py-1 rounded cursor-pointer hover:bg-muted/50 text-sm ${selected === node.name ? "bg-muted font-medium" : ""}`}
+        style={{ paddingLeft: `${8 + depth * 12}px` }}
+        onClick={() => onSelect(node.name)}
       >
-        {hasChildren ? (
-          open ? <ChevronDown className="h-3 w-3 shrink-0" /> : <ChevronRight className="h-3 w-3 shrink-0" />
-        ) : <File className="h-3 w-3 shrink-0 text-muted-foreground" />}
-        <FolderOpen className="h-3 w-3 shrink-0 text-muted-foreground" />
-        <span className="flex-1 truncate">{cat.name}</span>
-        <span className="text-muted-foreground text-xs ml-1">{count}</span>
-      </button>
-      {hasChildren && open && cat.children!.map(child => (
-        <CategoryTreeNode key={child.id} cat={child} selectedId={selectedId} onSelect={onSelect} allDocs={allDocs} depth={depth + 1} />
-      ))}
+        <div className="flex items-center gap-1">
+          {node.children && (
+            <button onClick={(e) => { e.stopPropagation(); setOpen(!open); }} className="text-muted-foreground">
+              {open ? "▾" : "▸"}
+            </button>
+          )}
+          <span>{node.name}</span>
+        </div>
+        <span className="text-xs text-muted-foreground">{count}</span>
+      </div>
+      {node.children && open && (
+        <div>
+          {node.children.map((child: any) => (
+            <CategoryNode key={child.name} node={child} docs={docs} selected={selected} onSelect={onSelect} depth={depth + 1} />
+          ))}
+        </div>
+      )}
     </div>
   );
 }
 
 export default function Documents() {
-  const [selectedCategory, setSelectedCategory] = useState("all");
-  const [search, setSearch] = useState("");
-  const [editingId, setEditingId] = useState<string | null>(null);
-  const [editName, setEditName] = useState("");
-  const editRef = useRef<HTMLInputElement>(null);
   const { toast } = useToast();
-  const allDocs = getAllDocuments();
+  const fileRef = useRef<HTMLInputElement>(null);
+  const [docs, setDocs] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [search, setSearch] = useState("");
+  const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
+  const [uploading, setUploading] = useState(false);
+
+  async function load() {
+    setLoading(true);
+    try {
+      const data = await documentsApi.getAll({
+        search: search || undefined,
+        category: selectedCategory || undefined,
+      });
+      setDocs(data);
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setLoading(false);
+    }
+  }
 
   useEffect(() => {
-    if (editingId && editRef.current) editRef.current.focus();
-  }, [editingId]);
+    const t = setTimeout(load, 300);
+    return () => clearTimeout(t);
+  }, [search, selectedCategory]);
 
-  const getCategoryIds = (catId: string): Set<string> => {
-    const ids = new Set<string>();
-    function collect(cats: DocumentCategory[]) {
-      for (const c of cats) { ids.add(c.id); if (c.children) collect(c.children); }
+  async function handleUpload(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setUploading(true);
+    try {
+      // Upload without a specific case — use a general upload
+      // For now, show a message that case must be selected
+      toast({ title: "Upload from case page", description: "Please upload documents from inside a case file." });
+    } finally {
+      setUploading(false);
+      if (fileRef.current) fileRef.current.value = "";
     }
-    const cat = findCat(DOCUMENT_CATEGORY_TREE, catId);
-    if (cat) { ids.add(cat.id); if (cat.children) collect(cat.children); }
-    return ids;
-  };
+  }
 
-  const filtered = allDocs
-    .filter((d) => {
-      if (selectedCategory === "all") return true;
-      const ids = getCategoryIds(selectedCategory);
-      return ids.has(d.category);
-    })
-    .filter((d) => !search || d.name.toLowerCase().includes(search.toLowerCase()) || d.caseFileNo.toLowerCase().includes(search.toLowerCase()));
+  async function handleDelete(id: string) {
+    if (!confirm("Delete this document?")) return;
+    await documentsApi.delete(id);
+    setDocs((prev) => prev.filter((d) => d.id !== id));
+    toast({ title: "Deleted" });
+  }
 
-  const startRename = (id: string, name: string) => {
-    setEditingId(id);
-    setEditName(name);
-  };
-
-  const saveRename = (id: string, originalName: string) => {
-    const ext = originalName.substring(originalName.lastIndexOf("."));
-    if (!editName.endsWith(ext)) {
-      toast({ title: "Invalid filename", description: `Filename must end with ${ext}`, variant: "destructive" });
-      return;
-    }
-    if (editName.trim() === "") {
-      toast({ title: "Invalid filename", description: "Filename cannot be empty", variant: "destructive" });
-      return;
-    }
-    toast({ title: "Document Renamed", description: `"${originalName}" → "${editName}"` });
-    setEditingId(null);
-  };
-
-  const handleRenameKeyDown = (e: React.KeyboardEvent, id: string, originalName: string) => {
-    if (e.key === "Enter") saveRename(id, originalName);
-    if (e.key === "Escape") setEditingId(null);
-  };
+  const filtered = selectedCategory
+    ? docs.filter((d) => d.category === selectedCategory)
+    : docs;
 
   return (
-    <AppLayout title="Documents">
-      <div className="flex gap-4">
-        {/* Category Tree Sidebar */}
-        <Card className="w-64 shrink-0 hidden lg:block">
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm">Categories</CardTitle>
-          </CardHeader>
-          <CardContent className="p-2">
-            <button
-              onClick={() => setSelectedCategory("all")}
-              className={cn(
-                "flex items-center gap-1.5 w-full text-left px-2 py-1.5 rounded text-xs hover:bg-muted/80 mb-1",
-                selectedCategory === "all" && "bg-primary/10 text-primary font-medium"
-              )}
-            >
-              <FolderOpen className="h-3 w-3" />
-              <span className="flex-1">All Documents</span>
-              <span className="text-muted-foreground">{allDocs.length}</span>
-            </button>
-            {DOCUMENT_CATEGORY_TREE.map(cat => (
-              <CategoryTreeNode key={cat.id} cat={cat} selectedId={selectedCategory} onSelect={setSelectedCategory} allDocs={allDocs} />
-            ))}
-          </CardContent>
-        </Card>
-
-        {/* Main Content */}
-        <Card className="flex-1">
-          <CardHeader className="pb-3 flex flex-row items-center justify-between">
-            <CardTitle className="text-base">All Documents</CardTitle>
-            <div className="flex gap-2">
-              <div className="relative">
-                <Search className="absolute left-2.5 top-2 h-3.5 w-3.5 text-muted-foreground" />
-                <Input placeholder="Search documents..." value={search} onChange={(e) => setSearch(e.target.value)} className="pl-8 h-8 text-xs w-48" />
-              </div>
-              <Button size="sm" onClick={() => toast({ title: "Upload", description: "File upload will connect to backend." })}>
-                <Upload className="h-4 w-4 mr-1" /> Upload
-              </Button>
-            </div>
-          </CardHeader>
-          <CardContent className="p-0">
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead className="text-xs">Name</TableHead>
-                  <TableHead className="text-xs">Case</TableHead>
-                  <TableHead className="text-xs">Category</TableHead>
-                  <TableHead className="text-xs">Uploaded By</TableHead>
-                  <TableHead className="text-xs">Date</TableHead>
-                  <TableHead className="text-xs w-24"></TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {filtered.map((d) => (
-                  <TableRow key={d.id} className="text-sm">
-                    <TableCell className="py-2 font-medium">
-                      {editingId === d.id ? (
-                        <Input
-                          ref={editRef}
-                          value={editName}
-                          onChange={(e) => setEditName(e.target.value)}
-                          onBlur={() => saveRename(d.id, d.name)}
-                          onKeyDown={(e) => handleRenameKeyDown(e, d.id, d.name)}
-                          className="h-7 text-xs border-primary focus-visible:ring-primary"
-                        />
-                      ) : (
-                        <span
-                          className="cursor-pointer hover:text-primary hover:underline"
-                          onClick={() => startRename(d.id, d.name)}
-                          title="Click to rename"
-                        >
-                          {d.name}
-                        </span>
-                      )}
-                    </TableCell>
-                    <TableCell className="py-2"><Badge variant="outline" className="text-xs">{d.caseFileNo}</Badge></TableCell>
-                    <TableCell className="py-2 text-xs">{d.category}</TableCell>
-                    <TableCell className="py-2">{d.uploadedBy}</TableCell>
-                    <TableCell className="py-2">{formatDate(d.date)}</TableCell>
-                    <TableCell className="py-2">
-                      <div className="flex gap-0.5">
-                        <Button variant="ghost" size="icon" className="h-7 w-7"><Eye className="h-3 w-3" /></Button>
-                        <Button variant="ghost" size="icon" className="h-7 w-7"><Download className="h-3 w-3" /></Button>
-                        <Button variant="ghost" size="icon" className="h-7 w-7"><Trash2 className="h-3 w-3" /></Button>
-                      </div>
-                    </TableCell>
-                  </TableRow>
-                ))}
-                {filtered.length === 0 && (
-                  <TableRow><TableCell colSpan={6} className="py-8 text-center text-sm text-muted-foreground">No documents found.</TableCell></TableRow>
-                )}
-              </TableBody>
-            </Table>
-          </CardContent>
-        </Card>
+    <div className="flex gap-4 h-full">
+      {/* Category sidebar */}
+      <div className="w-64 bg-white rounded-lg border p-3 shrink-0">
+        <h3 className="font-semibold text-sm mb-2">Categories</h3>
+        <div
+          className={`flex items-center justify-between px-2 py-1 rounded cursor-pointer hover:bg-muted/50 text-sm ${!selectedCategory ? "bg-muted font-medium" : ""}`}
+          onClick={() => setSelectedCategory(null)}
+        >
+          <span>All Documents</span>
+          <span className="text-xs text-muted-foreground">{docs.length}</span>
+        </div>
+        {CATEGORY_TREE.map((node) => (
+          <CategoryNode key={node.name} node={node} docs={docs} selected={selectedCategory} onSelect={setSelectedCategory} />
+        ))}
       </div>
-    </AppLayout>
+
+      {/* Main area */}
+      <div className="flex-1 bg-white rounded-lg border">
+        <div className="flex items-center justify-between p-4 border-b">
+          <h2 className="font-semibold">{selectedCategory || "All Documents"}</h2>
+          <div className="flex gap-2">
+            <div className="relative">
+              <Search className="absolute left-2.5 top-2.5 w-4 h-4 text-muted-foreground" />
+              <Input
+                placeholder="Search documents..."
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                className="pl-8 w-56"
+              />
+            </div>
+            <input ref={fileRef} type="file" className="hidden" onChange={handleUpload} />
+            <Button onClick={() => fileRef.current?.click()} disabled={uploading} className="flex gap-2">
+              <Upload className="w-4 h-4" /> Upload
+            </Button>
+          </div>
+        </div>
+
+        <table className="w-full text-sm">
+          <thead>
+            <tr className="border-b text-left text-muted-foreground">
+              <th className="px-4 py-3 font-medium">Name</th>
+              <th className="px-4 py-3 font-medium">Case</th>
+              <th className="px-4 py-3 font-medium">Category</th>
+              <th className="px-4 py-3 font-medium">Uploaded By</th>
+              <th className="px-4 py-3 font-medium">Date</th>
+              <th className="px-4 py-3 font-medium"></th>
+            </tr>
+          </thead>
+          <tbody>
+            {loading ? (
+              <tr><td colSpan={6} className="px-4 py-8 text-center text-muted-foreground">Loading...</td></tr>
+            ) : filtered.length === 0 ? (
+              <tr><td colSpan={6} className="px-4 py-8 text-center text-muted-foreground">No documents found.</td></tr>
+            ) : (
+              filtered.map((d: any) => (
+                <tr key={d.id} className="border-b hover:bg-muted/30">
+                  <td className="px-4 py-3">
+                    <a href={`http://localhost:5000${d.fileUrl}`} target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:underline">
+                      {d.name}
+                    </a>
+                  </td>
+                  <td className="px-4 py-3 text-muted-foreground font-mono text-xs">{d.caseFileNo || "—"}</td>
+                  <td className="px-4 py-3 text-muted-foreground">{d.category || "—"}</td>
+                  <td className="px-4 py-3 text-muted-foreground">{d.uploadedBy || "—"}</td>
+                  <td className="px-4 py-3 text-muted-foreground">{d.date || "—"}</td>
+                  <td className="px-4 py-3">
+                    <button onClick={() => handleDelete(d.id)} className="text-xs text-red-500 hover:underline">Delete</button>
+                  </td>
+                </tr>
+              ))
+            )}
+          </tbody>
+        </table>
+      </div>
+    </div>
   );
 }

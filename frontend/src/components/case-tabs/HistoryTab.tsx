@@ -1,41 +1,52 @@
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { getHistoryByCaseId } from "@/data/mockData";
-import { formatDate } from "@/lib/formatters";
+import { useEffect, useState } from "react";
+import { historyApi } from "@/lib/api";
 
-export default function HistoryTab({ caseId }: { caseId: string }) {
-  const history = getHistoryByCaseId(caseId);
+interface Props { caseId: string; }
+
+export default function HistoryTab({ caseId }: Props) {
+  const [history, setHistory] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    historyApi.getByCaseId(caseId).then(setHistory).catch(console.error).finally(() => setLoading(false));
+  }, [caseId]);
 
   return (
-    <Card>
-      <CardHeader className="pb-3"><CardTitle className="text-base">Case History</CardTitle></CardHeader>
-      <CardContent className="p-0">
-        <Table>
-          <TableHeader><TableRow>
-            <TableHead className="text-xs">Date</TableHead>
-            <TableHead className="text-xs">Time</TableHead>
-            <TableHead className="text-xs">User</TableHead>
-            <TableHead className="text-xs">Action</TableHead>
-            <TableHead className="text-xs">Field</TableHead>
-            <TableHead className="text-xs">Old Value</TableHead>
-            <TableHead className="text-xs">New Value</TableHead>
-          </TableRow></TableHeader>
-          <TableBody>
-            {history.map((h) => (
-              <TableRow key={h.id} className="text-sm">
-                <TableCell className="py-2">{formatDate(h.date)}</TableCell>
-                <TableCell className="py-2">{h.time}</TableCell>
-                <TableCell className="py-2">{h.user}</TableCell>
-                <TableCell className="py-2">{h.action}</TableCell>
-                <TableCell className="py-2">{h.fieldChanged}</TableCell>
-                <TableCell className="py-2 text-muted-foreground">{h.oldValue || "—"}</TableCell>
-                <TableCell className="py-2 font-medium">{h.newValue}</TableCell>
-              </TableRow>
-            ))}
-            {history.length === 0 && <TableRow><TableCell colSpan={7} className="py-4 text-center text-sm text-muted-foreground">No history.</TableCell></TableRow>}
-          </TableBody>
-        </Table>
-      </CardContent>
-    </Card>
+    <div className="p-4">
+      {loading ? (
+        <p className="text-sm text-muted-foreground">Loading history...</p>
+      ) : history.length === 0 ? (
+        <p className="text-sm text-muted-foreground">No history yet.</p>
+      ) : (
+        <div className="bg-white border rounded-lg overflow-x-auto">
+          <table className="w-full text-sm">
+            <thead>
+              <tr className="border-b text-left text-muted-foreground">
+                <th className="px-4 py-2 font-medium">Date</th>
+                <th className="px-4 py-2 font-medium">Time</th>
+                <th className="px-4 py-2 font-medium">User</th>
+                <th className="px-4 py-2 font-medium">Action</th>
+                <th className="px-4 py-2 font-medium">Field</th>
+                <th className="px-4 py-2 font-medium">Old Value</th>
+                <th className="px-4 py-2 font-medium">New Value</th>
+              </tr>
+            </thead>
+            <tbody>
+              {history.map((h: any) => (
+                <tr key={h.id} className="border-b hover:bg-muted/30">
+                  <td className="px-4 py-2 text-muted-foreground">{h.date}</td>
+                  <td className="px-4 py-2 text-muted-foreground">{h.time}</td>
+                  <td className="px-4 py-2">{h.user}</td>
+                  <td className="px-4 py-2">{h.action}</td>
+                  <td className="px-4 py-2 text-muted-foreground">{h.fieldChanged || "—"}</td>
+                  <td className="px-4 py-2 text-muted-foreground">{h.oldValue || "—"}</td>
+                  <td className="px-4 py-2">{h.newValue || "—"}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+    </div>
   );
 }

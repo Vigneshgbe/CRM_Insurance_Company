@@ -1,72 +1,92 @@
-import { useState } from "react";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Label } from "@/components/ui/label";
-import { getStatusHistoryByCaseId, getCaseById, type StatusEntry } from "@/data/mockData";
-import { FILE_STATUSES } from "@/lib/constants";
-import { formatDate } from "@/lib/formatters";
+import { historyApi, casesApi } from "@/lib/api";
+import { useAuth } from "@/lib/auth";
 import { useToast } from "@/hooks/use-toast";
 
-export default function StatusTab({ caseId }: { caseId: string }) {
-  const caseData = getCaseById(caseId);
-  const [statusHistory, setStatusHistory] = useState<StatusEntry[]>(getStatusHistoryByCaseId(caseId));
-  const [currentStatus, setCurrentStatus] = useState(caseData?.fileStatus || "Active");
-  const [loading, setLoading] = useState(false);
-  const { toast } = useToast();
+const STATUSES = ["Active", "Closed", "Pending", "On Hold", "Settled", "Litigation", "Mediation", "Arbitration"];
 
-  const updateStatus = () => {
-    setLoading(true);
-    setTimeout(() => {
-      const entry: StatusEntry = {
-        id: `s${Date.now()}`, caseId, status: currentStatus,
-        date: new Date().toISOString().split("T")[0], changedBy: "Amanda Singh",
-      };
-      setStatusHistory([entry, ...statusHistory]);
-      toast({ title: "Status Updated", description: `Case status changed to ${currentStatus}.` });
-      setLoading(false);
-    }, 500);
-  };
+interface Props { caseId: string; caseData?: any; onUpdate?: () => void; }
+
+export default function StatusTab({ caseId, caseData, onUpdate }: Props) {
+  const { user } = useAuth();
+  const { toast } = useToast();
+  const [history, setHistory] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [newStatus, setNewStatus] = useState("");
+  const [saving, setSaving] = useState(false);
+
+  useEffect(() => {
+    setNewStatus(caseData?.fileStatus || "");
+    historyApi.getStatusHistory(caseId).then(setHistory).catch(console.error).finally(() => setLoading(false));
+  }, [caseId, caseData]);
+
+  async function handleUpdate() {
+    if (!newStatus || newStatus === caseData?.fileStatus) { toast({ title: "No change" }); return; }
+    setSaving(true);
+    try {
+      await casesApi.update(caseId, { ...caseData, fileStatus: newStatus });
+      toast({ title: `Status updated to ${newStatus}` });
+      onUpdate?.();
+      const data = await historyApi.getStatusHistory(caseId);
+      setHistory(data);
+    } catch (err) {
+      toast({ title: "Failed to update status", variant: "destructive" });
+    } finally { setSaving(false); }
+  }
 
   return (
-    <div className="space-y-4">
-      <Card>
-        <CardHeader className="pb-2"><CardTitle className="text-sm">Current Status</CardTitle></CardHeader>
-        <CardContent>
-          <div className="flex items-end gap-3 max-w-md">
-            <div className="flex-1">
-              <Label className="text-xs">Status</Label>
-              <Select value={currentStatus} onValueChange={setCurrentStatus}>
-                <SelectTrigger className="h-9 text-sm mt-1"><SelectValue /></SelectTrigger>
-                <SelectContent>{FILE_STATUSES.map((s) => <SelectItem key={s} value={s}>{s}</SelectItem>)}</SelectContent>
-              </Select>
-            </div>
-            <Button onClick={updateStatus} disabled={loading}>{loading ? "Updating..." : "Update Status"}</Button>
+    <div className="space-y-4 p-4">
+      {/* Update status */}
+      <div className="bg-white border rounded-lg p-4">
+        <h3 className="font-medium text-sm mb-3">Update Status</h3>
+        <div className="flex gap-3 items-end">
+          <div className="flex-1">
+            <label className="text-xs text-muted-foreground mb-1 block">Current: <strong>{caseData?.fileStatus}</strong></label>
+            <select
+              value={newStatus}
+              onChange={(e) => setNewStatus(e.target.value)}
+              className="h-10 w-full rounded-md border border-input bg-background px-3 text-sm"
+            >
+              {STATUSES.map((s) => <option key={s}>{s}</option>)}
+            </select>
           </div>
-        </CardContent>
-      </Card>
+          <Button onClick={handleUpdate} disabled={saving || newStatus === caseData?.fileStatus} size="sm">
+            {saving ? "Saving..." : "Update Status"}
+          </Button>
+        </div>
+      </div>
 
-      <Card>
-        <CardHeader className="pb-3"><CardTitle className="text-sm">Status History</CardTitle></CardHeader>
-        <CardContent>
-          <div className="space-y-3">
-            {statusHistory.map((s, i) => (
-              <div key={s.id} className="flex items-center gap-3">
-                <div className="flex flex-col items-center">
-                  <div className="h-3 w-3 rounded-full bg-primary" />
-                  {i < statusHistory.length - 1 && <div className="w-px h-6 bg-border" />}
-                </div>
-                <div className="flex items-center gap-2">
-                  <Badge variant="secondary" className="text-xs">{s.status}</Badge>
-                  <span className="text-xs text-muted-foreground">{formatDate(s.date)} · {s.changedBy}</span>
-                </div>
-              </div>
-            ))}
-            {statusHistory.length === 0 && <p className="text-sm text-muted-foreground">No status history.</p>}
-          </div>
-        </CardContent>
-      </Card>
+      {/* Status history */}
+      <div className="bg-white border rounded-lg">
+        <div className="p-3 border-b">
+          <h3 className="font-medium text-sm">Status History</h3>
+        </div>
+        {loading ? (
+          <p className="p-4 text-sm text-muted-foreground">Loading...</p>
+        ) : history.length === 0 ? (
+          <p className="p-4 text-sm text-muted-foreground">No status history.</p>
+        ) : (
+          <table className="w-full text-sm">
+            <thead>
+              <tr className="border-b text-left text-muted-foreground">
+                <th className="px-4 py-2 font-medium">Status</th>
+                <th className="px-4 py-2 font-medium">Date</th>
+                <th className="px-4 py-2 font-medium">Changed By</th>
+              </tr>
+            </thead>
+            <tbody>
+              {history.map((h: any) => (
+                <tr key={h.id} className="border-b hover:bg-muted/30">
+                  <td className="px-4 py-2 font-medium">{h.status}</td>
+                  <td className="px-4 py-2 text-muted-foreground">{h.date}</td>
+                  <td className="px-4 py-2 text-muted-foreground">{h.changedBy}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        )}
+      </div>
     </div>
   );
 }

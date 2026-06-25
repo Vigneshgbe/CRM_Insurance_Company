@@ -1,105 +1,115 @@
-import { useForm } from "react-hook-form";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { settlementApi } from "@/lib/api";
 import { useToast } from "@/hooks/use-toast";
-import { useState, useEffect } from "react";
-import { getSettlementByCaseId } from "@/data/mockData";
-import { formatCurrency } from "@/lib/formatters";
-import { cn } from "@/lib/utils";
 
-export default function SettlementTab({ caseId }: { caseId: string }) {
+interface Props { caseId: string; }
+
+const defaultData = {
+  finalSettlement: 0, ourFee: 0, rehabOutstanding: 0,
+  assessmentOutstanding: 0, outstanding3: 0, outstanding4: 0,
+  hst: 0, ourFeeHst: 0, payToClient: 0, ourFinalAccount: 0,
+};
+
+function currency(n: number) {
+  return new Intl.NumberFormat("en-CA", { style: "currency", currency: "CAD" }).format(n);
+}
+
+export default function SettlementTab({ caseId }: Props) {
   const { toast } = useToast();
-  const [loading, setLoading] = useState(false);
-  const data = getSettlementByCaseId(caseId);
-  const { register, handleSubmit, watch, setValue } = useForm({ defaultValues: data });
-
-  const values = watch();
-
-  const fs = Number(values.finalSettlement) || 0;
-  const fee = Number(values.ourFee) || 0;
-  const rehab = Number(values.rehabOutstanding) || 0;
-  const assess = Number(values.assessmentOutstanding) || 0;
-  const o3 = Number(values.outstanding3) || 0;
-  const o4 = Number(values.outstanding4) || 0;
-  const hst = Number(values.hst) || 0;
-  const feeHst = Number(values.ourFeeHst) || 0;
-
-  const totalDeductions = fee + rehab + assess + o3 + o4 + hst + feeHst;
-  const payToClient = fs - totalDeductions;
-  const finalAccount = fee + feeHst;
+  const [data, setData] = useState(defaultData);
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
 
   useEffect(() => {
-    setValue("payToClient", payToClient);
-    setValue("ourFinalAccount", finalAccount);
-  }, [payToClient, finalAccount, setValue]);
+    settlementApi.getByCaseId(caseId)
+      .then((d) => setData({ ...defaultData, ...d }))
+      .catch(console.error)
+      .finally(() => setLoading(false));
+  }, [caseId]);
 
-  const onSubmit = () => {
-    setLoading(true);
-    setTimeout(() => { toast({ title: "Settlement Saved" }); setLoading(false); }, 500);
-  };
+  // Auto-compute payToClient and ourFinalAccount
+  function computed() {
+    const deductions = data.ourFee + data.rehabOutstanding + data.assessmentOutstanding +
+      data.outstanding3 + data.outstanding4 + data.hst + data.ourFeeHst;
+    const payToClient = data.finalSettlement - deductions;
+    const ourFinalAccount = data.ourFee + data.ourFeeHst;
+    return { payToClient, ourFinalAccount };
+  }
 
-  const F = ({ label, name, readOnly = false, highlight = false }: { label: string; name: string; readOnly?: boolean; highlight?: boolean }) => (
-    <div className={cn(highlight ? "p-3 rounded-lg bg-green-50 border border-green-200" : "")}>
-      <Label className={cn("text-xs", highlight ? "text-green-700 font-semibold" : "")}>{label}</Label>
-      <div className="relative mt-1">
-        <span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-xs text-muted-foreground">$</span>
-        <Input
-          {...register(name as any)}
-          type="number"
-          className={cn("h-9 text-sm pl-6", readOnly ? "bg-muted" : "", highlight ? "text-green-700 font-bold text-base bg-green-50 border-green-300" : "")}
-          readOnly={readOnly}
-        />
-      </div>
-    </div>
-  );
+  function set(field: string, val: string) {
+    setData((prev) => ({ ...prev, [field]: parseFloat(val) || 0 }));
+  }
+
+  async function handleSave() {
+    const { payToClient, ourFinalAccount } = computed();
+    setSaving(true);
+    try {
+      const saved = await settlementApi.upsert(caseId, { ...data, payToClient, ourFinalAccount });
+      setData({ ...defaultData, ...saved });
+      toast({ title: "Settlement saved" });
+    } catch (err) {
+      toast({ title: "Failed to save", variant: "destructive" });
+    } finally { setSaving(false); }
+  }
+
+  const { payToClient, ourFinalAccount } = computed();
+
+  const fields: { label: string; key: string; computed?: boolean }[] = [
+    { label: "Final Settlement Amount", key: "finalSettlement" },
+    { label: "Our Fee", key: "ourFee" },
+    { label: "Rehab Outstanding", key: "rehabOutstanding" },
+    { label: "Assessment Outstanding", key: "assessmentOutstanding" },
+    { label: "Outstanding (Other 1)", key: "outstanding3" },
+    { label: "Outstanding (Other 2)", key: "outstanding4" },
+    { label: "HST", key: "hst" },
+    { label: "Our Fee + HST", key: "ourFeeHst" },
+  ];
+
+  if (loading) return <p className="p-4 text-sm text-muted-foreground">Loading...</p>;
 
   return (
-    <form onSubmit={handleSubmit(onSubmit)}>
-      <Card>
-        <CardHeader className="pb-2"><CardTitle className="text-sm">Settlement Proposal</CardTitle></CardHeader>
-        <CardContent>
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 max-w-4xl">
-            <F label="Final Settlement Amount" name="finalSettlement" />
-            <F label="Our Fee Herein" name="ourFee" />
-            <F label="Rehab Outstanding" name="rehabOutstanding" />
-            <F label="Assessment Outstanding" name="assessmentOutstanding" />
-            <F label="Outstanding-3" name="outstanding3" />
-            <F label="Outstanding-4" name="outstanding4" />
-            <F label="HST" name="hst" />
-            <F label="Our Fee HST" name="ourFeeHst" />
-            <F label="Pay to Client" name="payToClient" readOnly highlight />
-            <F label="Our Final Account Herein" name="ourFinalAccount" readOnly />
-          </div>
-        </CardContent>
-      </Card>
+    <div className="p-4 space-y-4">
+      <div className="bg-white border rounded-lg p-4">
+        <h3 className="font-medium mb-4">Settlement Proposal</h3>
+        <div className="grid grid-cols-2 gap-4">
+          {fields.map((f) => (
+            <div key={f.key}>
+              <Label className="text-xs">{f.label}</Label>
+              <div className="relative mt-1">
+                <span className="absolute left-3 top-2.5 text-sm text-muted-foreground">$</span>
+                <Input
+                  type="number"
+                  step="0.01"
+                  value={(data as any)[f.key]}
+                  onChange={(e) => set(f.key, e.target.value)}
+                  className="pl-6"
+                />
+              </div>
+            </div>
+          ))}
+        </div>
 
-      {/* Settlement Summary */}
-      <Card className="mt-4">
-        <CardContent className="p-6">
-          <h3 className="text-sm font-semibold mb-4">Settlement Summary</h3>
-          <div className="max-w-md space-y-2">
-            <div className="flex justify-between text-sm">
-              <span>Final Settlement:</span>
-              <span className="font-medium">{formatCurrency(fs)}</span>
-            </div>
-            <div className="flex justify-between text-sm">
-              <span>Total Deductions:</span>
-              <span className="font-medium text-destructive">-{formatCurrency(totalDeductions)}</span>
-            </div>
-            <div className="border-t my-2" />
-            <div className="flex justify-between text-lg font-bold text-green-700">
-              <span>Pay to Client:</span>
-              <span>{formatCurrency(payToClient)}</span>
-            </div>
+        {/* Computed fields */}
+        <div className="mt-4 pt-4 border-t grid grid-cols-2 gap-4">
+          <div className="bg-blue-50 rounded-lg p-3">
+            <p className="text-xs text-muted-foreground">Pay to Client</p>
+            <p className="text-xl font-bold text-blue-700">{currency(payToClient)}</p>
           </div>
-        </CardContent>
-      </Card>
+          <div className="bg-green-50 rounded-lg p-3">
+            <p className="text-xs text-muted-foreground">Our Final Account</p>
+            <p className="text-xl font-bold text-green-700">{currency(ourFinalAccount)}</p>
+          </div>
+        </div>
 
-      <div className="sticky bottom-0 bg-background border-t py-3 mt-4 flex justify-end">
-        <Button type="submit" disabled={loading}>{loading ? "Saving..." : "Save Settlement"}</Button>
+        <div className="mt-4 flex justify-end">
+          <Button onClick={handleSave} disabled={saving}>
+            {saving ? "Saving..." : "Save Settlement"}
+          </Button>
+        </div>
       </div>
-    </form>
+    </div>
   );
 }

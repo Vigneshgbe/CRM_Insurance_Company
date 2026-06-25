@@ -1,97 +1,125 @@
-import { useState } from "react";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { getContactAccessByCaseId, type ContactAccess } from "@/data/mockData";
-import { formatDate } from "@/lib/formatters";
+import { contactAccessApi } from "@/lib/api";
 import { useToast } from "@/hooks/use-toast";
-import { Plus, Trash2 } from "lucide-react";
+import { Trash2 } from "lucide-react";
 
-export default function ContactAccessTab({ caseId }: { caseId: string }) {
-  const [access, setAccess] = useState<ContactAccess[]>(getContactAccessByCaseId(caseId));
-  const [open, setOpen] = useState(false);
-  const [newAccess, setNewAccess] = useState({ name: "", role: "Staff", accessLevel: "Read Only" });
+interface Props { caseId: string; }
+
+export default function ContactAccessTab({ caseId }: Props) {
   const { toast } = useToast();
+  const [contacts, setContacts] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [showForm, setShowForm] = useState(false);
+  const [form, setForm] = useState({ name: "", role: "", accessLevel: "Read Only" });
+  const [saving, setSaving] = useState(false);
 
-  const add = () => {
-    const item: ContactAccess = {
-      id: `ca${Date.now()}`, caseId, name: newAccess.name, role: newAccess.role,
-      accessLevel: newAccess.accessLevel, dateAdded: new Date().toISOString().split("T")[0],
-    };
-    setAccess([...access, item]);
-    setOpen(false);
-    setNewAccess({ name: "", role: "Staff", accessLevel: "Read Only" });
-    toast({ title: "Access Added" });
-  };
+  useEffect(() => { load(); }, [caseId]);
 
-  const remove = (id: string) => {
-    setAccess(access.filter((a) => a.id !== id));
-    toast({ title: "Access Removed" });
-  };
+  async function load() {
+    setLoading(true);
+    try { setContacts(await contactAccessApi.getByCaseId(caseId)); }
+    catch (err) { console.error(err); }
+    finally { setLoading(false); }
+  }
+
+  async function handleAdd() {
+    if (!form.name) { toast({ title: "Name required", variant: "destructive" }); return; }
+    setSaving(true);
+    try {
+      await contactAccessApi.create(caseId, { ...form, dateAdded: new Date().toISOString().slice(0, 10) });
+      setForm({ name: "", role: "", accessLevel: "Read Only" });
+      setShowForm(false);
+      toast({ title: "Contact added" });
+      load();
+    } catch (err) {
+      toast({ title: "Failed to add", variant: "destructive" });
+    } finally { setSaving(false); }
+  }
+
+  async function handleDelete(id: string) {
+    if (!confirm("Remove this contact?")) return;
+    await contactAccessApi.delete(caseId, id);
+    toast({ title: "Removed" });
+    load();
+  }
 
   return (
-    <Card>
-      <CardHeader className="pb-3 flex flex-row items-center justify-between">
-        <CardTitle className="text-base">Contact Access</CardTitle>
-        <Dialog open={open} onOpenChange={setOpen}>
-          <DialogTrigger asChild><Button size="sm"><Plus className="h-4 w-4 mr-1" /> Add Access</Button></DialogTrigger>
-          <DialogContent>
-            <DialogHeader><DialogTitle>Add Access</DialogTitle></DialogHeader>
-            <div className="space-y-3">
-              <div><Label className="text-xs">Name</Label><Input value={newAccess.name} onChange={(e) => setNewAccess({ ...newAccess, name: e.target.value })} className="h-8 text-sm mt-1" /></div>
-              <div><Label className="text-xs">Role</Label>
-                <Select value={newAccess.role} onValueChange={(v) => setNewAccess({ ...newAccess, role: v })}>
-                  <SelectTrigger className="h-8 text-sm mt-1"><SelectValue /></SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="Admin">Admin</SelectItem>
-                    <SelectItem value="Clerk">Clerk</SelectItem>
-                    <SelectItem value="Secretary">Secretary</SelectItem>
-                    <SelectItem value="Lawyer">Lawyer</SelectItem>
-                    <SelectItem value="Staff">Staff</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-              <div><Label className="text-xs">Access Level</Label>
-                <Select value={newAccess.accessLevel} onValueChange={(v) => setNewAccess({ ...newAccess, accessLevel: v })}>
-                  <SelectTrigger className="h-8 text-sm mt-1"><SelectValue /></SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="Full">Full</SelectItem>
-                    <SelectItem value="Read Only">Read Only</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-              <Button onClick={add} className="w-full">Add</Button>
+    <div className="space-y-4 p-4">
+      <div className="flex justify-end">
+        <Button size="sm" onClick={() => setShowForm(!showForm)}>+ Add Contact</Button>
+      </div>
+
+      {showForm && (
+        <div className="bg-white border rounded-lg p-4 space-y-3">
+          <h3 className="font-medium text-sm">Add Contact Access</h3>
+          <div className="grid grid-cols-3 gap-3">
+            <div>
+              <Label>Name</Label>
+              <Input value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} placeholder="Full name" />
             </div>
-          </DialogContent>
-        </Dialog>
-      </CardHeader>
-      <CardContent className="p-0">
-        <Table>
-          <TableHeader><TableRow>
-            <TableHead className="text-xs">Name</TableHead>
-            <TableHead className="text-xs">Role</TableHead>
-            <TableHead className="text-xs">Access Level</TableHead>
-            <TableHead className="text-xs">Date Added</TableHead>
-            <TableHead className="text-xs w-10"></TableHead>
-          </TableRow></TableHeader>
-          <TableBody>
-            {access.map((a) => (
-              <TableRow key={a.id} className="text-sm">
-                <TableCell className="py-2">{a.name}</TableCell>
-                <TableCell className="py-2">{a.role}</TableCell>
-                <TableCell className="py-2"><Badge variant="secondary" className="text-xs">{a.accessLevel}</Badge></TableCell>
-                <TableCell className="py-2">{formatDate(a.dateAdded)}</TableCell>
-                <TableCell className="py-2"><Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => remove(a.id)}><Trash2 className="h-3 w-3" /></Button></TableCell>
-              </TableRow>
-            ))}
-          </TableBody>
-        </Table>
-      </CardContent>
-    </Card>
+            <div>
+              <Label>Role</Label>
+              <Input value={form.role} onChange={(e) => setForm({ ...form, role: e.target.value })} placeholder="e.g. Spouse" />
+            </div>
+            <div>
+              <Label>Access Level</Label>
+              <select
+                value={form.accessLevel}
+                onChange={(e) => setForm({ ...form, accessLevel: e.target.value })}
+                className="h-10 w-full rounded-md border border-input bg-background px-3 text-sm"
+              >
+                <option>Read Only</option>
+                <option>Full Access</option>
+                <option>Documents Only</option>
+              </select>
+            </div>
+          </div>
+          <div className="flex justify-end gap-2">
+            <Button variant="outline" size="sm" onClick={() => setShowForm(false)}>Cancel</Button>
+            <Button size="sm" onClick={handleAdd} disabled={saving}>{saving ? "Saving..." : "Add"}</Button>
+          </div>
+        </div>
+      )}
+
+      <div className="bg-white border rounded-lg overflow-hidden">
+        <table className="w-full text-sm">
+          <thead>
+            <tr className="border-b text-left text-muted-foreground">
+              <th className="px-4 py-2 font-medium">Name</th>
+              <th className="px-4 py-2 font-medium">Role</th>
+              <th className="px-4 py-2 font-medium">Access Level</th>
+              <th className="px-4 py-2 font-medium">Date Added</th>
+              <th className="px-4 py-2"></th>
+            </tr>
+          </thead>
+          <tbody>
+            {loading ? (
+              <tr><td colSpan={5} className="px-4 py-4 text-center text-muted-foreground">Loading...</td></tr>
+            ) : contacts.length === 0 ? (
+              <tr><td colSpan={5} className="px-4 py-4 text-center text-muted-foreground">No contacts added yet.</td></tr>
+            ) : (
+              contacts.map((c: any) => (
+                <tr key={c.id} className="border-b hover:bg-muted/30">
+                  <td className="px-4 py-2 font-medium">{c.name}</td>
+                  <td className="px-4 py-2 text-muted-foreground">{c.role || "—"}</td>
+                  <td className="px-4 py-2">
+                    <span className="px-2 py-0.5 rounded text-xs bg-blue-100 text-blue-700">{c.accessLevel}</span>
+                  </td>
+                  <td className="px-4 py-2 text-muted-foreground">{c.dateAdded}</td>
+                  <td className="px-4 py-2">
+                    <button onClick={() => handleDelete(c.id)} className="text-muted-foreground hover:text-red-500">
+                      <Trash2 className="w-4 h-4" />
+                    </button>
+                  </td>
+                </tr>
+              ))
+            )}
+          </tbody>
+        </table>
+      </div>
+    </div>
   );
 }

@@ -1,117 +1,114 @@
-import { useState } from "react";
-import { useNavigate } from "react-router-dom";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { useEffect, useState, useRef } from "react";
+import { Upload, Trash2, FileText } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { getDocumentsByCaseId } from "@/data/mockData";
-import { DOCUMENT_CATEGORIES } from "@/lib/constants";
-import { formatDate } from "@/lib/formatters";
+import { documentsApi } from "@/lib/api";
 import { useToast } from "@/hooks/use-toast";
-import { Upload, Eye, Download, Trash2, FileText, DollarSign, FileCheck, ClipboardList, ArrowRight } from "lucide-react";
-import TemplateFillModal from "@/components/templates/TemplateFillModal";
 
-const TEMPLATE_CARDS = [
-  { id: "ocf-6", name: "OCF-6 Expenses Claim", icon: DollarSign },
-  { id: "ocf-10", name: "OCF-10 Election of Benefits", icon: FileCheck },
-  { id: "matrix-intake", name: "Matrix Intake Form", icon: ClipboardList },
+interface Props { caseId: string; }
+
+const CATEGORIES = [
+  "Insurance", "Medical - Family Doctor", "Assessment Report",
+  "Specialist Report", "I Report", "Police Report", "Other Documents",
 ];
 
-export default function DocumentsTab({ caseId }: { caseId: string }) {
-  const docs = getDocumentsByCaseId(caseId);
-  const [filter, setFilter] = useState("all");
+export default function DocumentsTab({ caseId }: Props) {
   const { toast } = useToast();
-  const navigate = useNavigate();
-  const filtered = filter === "all" ? docs : docs.filter((d) => d.category === filter);
-  const [fillModal, setFillModal] = useState<{ open: boolean; templateId: string; templateName: string }>({ open: false, templateId: "", templateName: "" });
+  const fileRef = useRef<HTMLInputElement>(null);
+  const [docs, setDocs] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [uploading, setUploading] = useState(false);
+  const [category, setCategory] = useState("Other Documents");
+
+  useEffect(() => { load(); }, [caseId]);
+
+  async function load() {
+    setLoading(true);
+    try { setDocs(await documentsApi.getByCaseId(caseId)); }
+    catch (err) { console.error(err); }
+    finally { setLoading(false); }
+  }
+
+  async function handleUpload(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setUploading(true);
+    try {
+      await documentsApi.upload(caseId, file, category);
+      toast({ title: "Document uploaded" });
+      load();
+    } catch (err) {
+      toast({ title: "Upload failed", variant: "destructive" });
+    } finally {
+      setUploading(false);
+      if (fileRef.current) fileRef.current.value = "";
+    }
+  }
+
+  async function handleDelete(id: string) {
+    if (!confirm("Delete this document?")) return;
+    await documentsApi.delete(id);
+    toast({ title: "Deleted" });
+    load();
+  }
 
   return (
-    <div className="space-y-4">
-      {/* PDF Templates Section */}
-      <Card>
-        <CardHeader className="pb-3">
-          <CardTitle className="text-base">PDF Templates</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
-            {TEMPLATE_CARDS.map((t) => (
-              <div key={t.id} className="border rounded-lg p-3 flex items-center justify-between">
-                <div className="flex items-center gap-2">
-                  <t.icon className="h-4 w-4 text-primary" />
-                  <span className="text-xs font-medium">{t.name}</span>
-                </div>
-                <Button size="sm" variant="outline" className="text-xs h-7" onClick={() => setFillModal({ open: true, templateId: t.id, templateName: t.name })}>
-                  Fill & Export
-                </Button>
-              </div>
-            ))}
-            <div
-              className="border-2 border-dashed rounded-lg p-3 flex items-center justify-center gap-2 cursor-pointer hover:border-primary/50 text-muted-foreground hover:text-foreground transition-colors"
-              onClick={() => navigate("/templates")}
-            >
-              <span className="text-xs font-medium">More Templates</span>
-              <ArrowRight className="h-3.5 w-3.5" />
-            </div>
-          </div>
-        </CardContent>
-      </Card>
+    <div className="space-y-4 p-4">
+      {/* Upload bar */}
+      <div className="flex gap-3 items-center flex-wrap">
+        <select
+          value={category}
+          onChange={(e) => setCategory(e.target.value)}
+          className="h-10 rounded-md border border-input bg-background px-3 text-sm"
+        >
+          {CATEGORIES.map((c) => <option key={c}>{c}</option>)}
+        </select>
+        <input ref={fileRef} type="file" className="hidden" onChange={handleUpload} />
+        <Button onClick={() => fileRef.current?.click()} disabled={uploading} className="flex gap-2">
+          <Upload className="w-4 h-4" /> {uploading ? "Uploading..." : "Upload Document"}
+        </Button>
+      </div>
 
-      {/* Documents Table */}
-      <Card>
-        <CardHeader className="pb-3 flex flex-row items-center justify-between">
-          <CardTitle className="text-base">Documents</CardTitle>
-          <div className="flex gap-2">
-            <Select value={filter} onValueChange={setFilter}>
-              <SelectTrigger className="w-40 h-8 text-xs"><SelectValue placeholder="All Categories" /></SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">All Categories</SelectItem>
-                {DOCUMENT_CATEGORIES.map((c) => <SelectItem key={c} value={c}>{c}</SelectItem>)}
-              </SelectContent>
-            </Select>
-            <Button size="sm" onClick={() => toast({ title: "Upload", description: "File upload will connect to backend." })}>
-              <Upload className="h-4 w-4 mr-1" /> Upload
-            </Button>
-          </div>
-        </CardHeader>
-        <CardContent className="p-0">
-          <Table>
-            <TableHeader><TableRow>
-              <TableHead className="text-xs">Name</TableHead>
-              <TableHead className="text-xs">Category</TableHead>
-              <TableHead className="text-xs">Uploaded By</TableHead>
-              <TableHead className="text-xs">Date</TableHead>
-              <TableHead className="text-xs w-24"></TableHead>
-            </TableRow></TableHeader>
-            <TableBody>
-              {filtered.map((d) => (
-                <TableRow key={d.id} className="text-sm">
-                  <TableCell className="py-2 font-medium">{d.name}</TableCell>
-                  <TableCell className="py-2">{d.category}</TableCell>
-                  <TableCell className="py-2">{d.uploadedBy}</TableCell>
-                  <TableCell className="py-2">{formatDate(d.date)}</TableCell>
-                  <TableCell className="py-2">
-                    <div className="flex gap-0.5">
-                      <Button variant="ghost" size="icon" className="h-7 w-7"><Eye className="h-3 w-3" /></Button>
-                      <Button variant="ghost" size="icon" className="h-7 w-7"><Download className="h-3 w-3" /></Button>
-                      <Button variant="ghost" size="icon" className="h-7 w-7"><Trash2 className="h-3 w-3" /></Button>
-                    </div>
-                  </TableCell>
-                </TableRow>
+      {/* List */}
+      {loading ? (
+        <p className="text-sm text-muted-foreground">Loading...</p>
+      ) : docs.length === 0 ? (
+        <div className="text-center py-8 text-muted-foreground">
+          <FileText className="w-8 h-8 mx-auto mb-2 opacity-40" />
+          <p className="text-sm">No documents uploaded yet.</p>
+        </div>
+      ) : (
+        <div className="bg-white border rounded-lg overflow-hidden">
+          <table className="w-full text-sm">
+            <thead>
+              <tr className="border-b text-left text-muted-foreground">
+                <th className="px-4 py-2 font-medium">Name</th>
+                <th className="px-4 py-2 font-medium">Category</th>
+                <th className="px-4 py-2 font-medium">Uploaded By</th>
+                <th className="px-4 py-2 font-medium">Date</th>
+                <th className="px-4 py-2"></th>
+              </tr>
+            </thead>
+            <tbody>
+              {docs.map((d: any) => (
+                <tr key={d.id} className="border-b hover:bg-muted/30">
+                  <td className="px-4 py-2">
+                    <a href={`http://localhost:5000${d.fileUrl}`} target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:underline flex items-center gap-1">
+                      <FileText className="w-3 h-3" /> {d.name}
+                    </a>
+                  </td>
+                  <td className="px-4 py-2 text-muted-foreground">{d.category || "—"}</td>
+                  <td className="px-4 py-2 text-muted-foreground">{d.uploadedBy || "—"}</td>
+                  <td className="px-4 py-2 text-muted-foreground">{d.date || "—"}</td>
+                  <td className="px-4 py-2">
+                    <button onClick={() => handleDelete(d.id)} className="text-muted-foreground hover:text-red-500">
+                      <Trash2 className="w-4 h-4" />
+                    </button>
+                  </td>
+                </tr>
               ))}
-              {filtered.length === 0 && <TableRow><TableCell colSpan={5} className="py-4 text-center text-sm text-muted-foreground">No documents.</TableCell></TableRow>}
-            </TableBody>
-          </Table>
-        </CardContent>
-      </Card>
-
-      {/* Fill & Export Modal */}
-      {fillModal.open && (
-        <TemplateFillModal
-          templateId={fillModal.templateId}
-          templateName={fillModal.templateName}
-          caseId={caseId}
-          onClose={() => setFillModal({ open: false, templateId: "", templateName: "" })}
-        />
+            </tbody>
+          </table>
+        </div>
       )}
     </div>
   );

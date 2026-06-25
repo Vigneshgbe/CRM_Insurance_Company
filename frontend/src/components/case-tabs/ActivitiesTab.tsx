@@ -1,105 +1,151 @@
-import { useState } from "react";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { getActivitiesByCaseId, type Activity } from "@/data/mockData";
-import { ACTIVITY_TYPES } from "@/lib/constants";
-import { formatDate } from "@/lib/formatters";
+import { Label } from "@/components/ui/label";
+import { activitiesApi } from "@/lib/api";
+import { useAuth } from "@/lib/auth";
 import { useToast } from "@/hooks/use-toast";
-import { Plus } from "lucide-react";
-import { cn } from "@/lib/utils";
+import { Trash2 } from "lucide-react";
 
-const typeBadge: Record<string, string> = {
-  Note: "bg-primary text-primary-foreground",
-  Task: "bg-warning text-warning-foreground",
-  Call: "bg-success text-success-foreground",
-  Email: "bg-secondary text-secondary-foreground",
-  Appointment: "bg-destructive text-destructive-foreground",
-};
+const ACTIVITY_TYPES = ["Note", "Task", "Call", "Email", "Appointment"];
 
-export default function ActivitiesTab({ caseId }: { caseId: string }) {
-  const [activities, setActivities] = useState<Activity[]>(getActivitiesByCaseId(caseId));
-  const [filter, setFilter] = useState("All");
-  const [open, setOpen] = useState(false);
-  const [newActivity, setNewActivity] = useState({ type: "Note", regarding: "", details: "", assignedTo: "" });
+interface Props { caseId: string; }
+
+export default function ActivitiesTab({ caseId }: Props) {
+  const { user } = useAuth();
   const { toast } = useToast();
+  const [activities, setActivities] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [filter, setFilter] = useState("All");
+  const [showForm, setShowForm] = useState(false);
+  const [form, setForm] = useState({ type: "Call", regarding: "", details: "" });
+  const [saving, setSaving] = useState(false);
+
+  useEffect(() => { load(); }, [caseId]);
+
+  async function load() {
+    setLoading(true);
+    try {
+      const data = await activitiesApi.getByCaseId(caseId);
+      setActivities(data);
+    } catch (err) { console.error(err); }
+    finally { setLoading(false); }
+  }
+
+  async function handleAdd() {
+    if (!form.regarding.trim()) { toast({ title: "Regarding field required", variant: "destructive" }); return; }
+    setSaving(true);
+    try {
+      const now = new Date();
+      await activitiesApi.create(caseId, {
+        date: now.toISOString().slice(0, 10),
+        time: now.toTimeString().slice(0, 5),
+        type: form.type,
+        regarding: form.regarding,
+        details: form.details,
+        recordManager: user?.name || "System",
+        companyGroup: "Internal",
+      });
+      setForm({ type: "Call", regarding: "", details: "" });
+      setShowForm(false);
+      toast({ title: "Activity added" });
+      load();
+    } catch (err) {
+      toast({ title: "Failed to save", variant: "destructive" });
+    } finally { setSaving(false); }
+  }
+
+  async function handleDelete(id: string) {
+    if (!confirm("Delete this activity?")) return;
+    await activitiesApi.delete(caseId, id);
+    toast({ title: "Deleted" });
+    load();
+  }
+
+  const typeColor: Record<string, string> = {
+    Note: "bg-gray-100 text-gray-600",
+    Task: "bg-purple-100 text-purple-700",
+    Call: "bg-blue-100 text-blue-700",
+    Email: "bg-green-100 text-green-700",
+    Appointment: "bg-orange-100 text-orange-700",
+  };
 
   const filtered = filter === "All" ? activities : activities.filter((a) => a.type === filter);
 
-  const addActivity = () => {
-    const a: Activity = {
-      id: `a${Date.now()}`, caseId, date: new Date().toISOString().split("T")[0],
-      time: new Date().toTimeString().slice(0, 5), type: newActivity.type,
-      regarding: newActivity.regarding, details: newActivity.details,
-      recordManager: "Amanda Singh", companyGroup: "Internal",
-    };
-    setActivities([a, ...activities]);
-    setOpen(false);
-    setNewActivity({ type: "Note", regarding: "", details: "", assignedTo: "" });
-    toast({ title: "Activity Added" });
-  };
-
   return (
-    <Card>
-      <CardHeader className="pb-3 flex flex-row items-center justify-between">
-        <CardTitle className="text-base">Activities</CardTitle>
-        <div className="flex gap-2">
-          <div className="flex gap-0.5">
-            {["All", ...ACTIVITY_TYPES].map((t) => (
-              <Button key={t} variant={filter === t ? "default" : "outline"} size="sm" className="text-xs h-7 px-2" onClick={() => setFilter(t)}>{t}</Button>
-            ))}
-          </div>
-          <Dialog open={open} onOpenChange={setOpen}>
-            <DialogTrigger asChild><Button size="sm"><Plus className="h-4 w-4 mr-1" /> Add Activity</Button></DialogTrigger>
-            <DialogContent>
-              <DialogHeader><DialogTitle>Add Activity</DialogTitle></DialogHeader>
-              <div className="space-y-3">
-                <div><Label className="text-xs">Type</Label>
-                  <Select value={newActivity.type} onValueChange={(v) => setNewActivity({ ...newActivity, type: v })}>
-                    <SelectTrigger className="h-8 text-sm mt-1"><SelectValue /></SelectTrigger>
-                    <SelectContent>{ACTIVITY_TYPES.map((t) => <SelectItem key={t} value={t}>{t}</SelectItem>)}</SelectContent>
-                  </Select>
-                </div>
-                <div><Label className="text-xs">Regarding</Label><Input value={newActivity.regarding} onChange={(e) => setNewActivity({ ...newActivity, regarding: e.target.value })} className="h-8 text-sm mt-1" /></div>
-                <div><Label className="text-xs">Details</Label><Textarea value={newActivity.details} onChange={(e) => setNewActivity({ ...newActivity, details: e.target.value })} rows={3} className="text-sm mt-1" /></div>
-                <div><Label className="text-xs">Assigned To</Label><Input value={newActivity.assignedTo} onChange={(e) => setNewActivity({ ...newActivity, assignedTo: e.target.value })} className="h-8 text-sm mt-1" /></div>
-                <Button onClick={addActivity} className="w-full">Add Activity</Button>
-              </div>
-            </DialogContent>
-          </Dialog>
+    <div className="space-y-4 p-4">
+      {/* Controls */}
+      <div className="flex items-center justify-between flex-wrap gap-2">
+        <div className="flex gap-2 flex-wrap">
+          {["All", ...ACTIVITY_TYPES].map((t) => (
+            <button
+              key={t}
+              onClick={() => setFilter(t)}
+              className={`px-3 py-1 rounded-full text-xs font-medium border transition-colors ${filter === t ? "bg-primary text-white border-primary" : "bg-white text-muted-foreground border-border hover:border-primary"}`}
+            >
+              {t}
+            </button>
+          ))}
         </div>
-      </CardHeader>
-      <CardContent className="p-0">
-        <Table>
-          <TableHeader><TableRow>
-            <TableHead className="text-xs">Date</TableHead>
-            <TableHead className="text-xs">Time</TableHead>
-            <TableHead className="text-xs">Type</TableHead>
-            <TableHead className="text-xs">Regarding</TableHead>
-            <TableHead className="text-xs">Record Manager</TableHead>
-            <TableHead className="text-xs">Company/Group</TableHead>
-          </TableRow></TableHeader>
-          <TableBody>
-            {filtered.map((a) => (
-              <TableRow key={a.id} className="text-sm">
-                <TableCell className="py-2">{formatDate(a.date)}</TableCell>
-                <TableCell className="py-2">{a.time}</TableCell>
-                <TableCell className="py-2"><Badge className={cn("text-xs", typeBadge[a.type] || "bg-secondary")}>{a.type}</Badge></TableCell>
-                <TableCell className="py-2">{a.regarding}</TableCell>
-                <TableCell className="py-2">{a.recordManager}</TableCell>
-                <TableCell className="py-2">{a.companyGroup}</TableCell>
-              </TableRow>
-            ))}
-            {filtered.length === 0 && <TableRow><TableCell colSpan={6} className="py-4 text-center text-sm text-muted-foreground">No activities.</TableCell></TableRow>}
-          </TableBody>
-        </Table>
-      </CardContent>
-    </Card>
+        <Button size="sm" onClick={() => setShowForm(!showForm)}>+ Add Activity</Button>
+      </div>
+
+      {/* Add form */}
+      {showForm && (
+        <div className="bg-white border rounded-lg p-4 space-y-3">
+          <h3 className="font-medium text-sm">New Activity</h3>
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <Label>Type</Label>
+              <select
+                value={form.type}
+                onChange={(e) => setForm({ ...form, type: e.target.value })}
+                className="h-10 w-full rounded-md border border-input bg-background px-3 text-sm"
+              >
+                {ACTIVITY_TYPES.map((t) => <option key={t}>{t}</option>)}
+              </select>
+            </div>
+            <div>
+              <Label>Regarding</Label>
+              <Input value={form.regarding} onChange={(e) => setForm({ ...form, regarding: e.target.value })} placeholder="Subject..." />
+            </div>
+          </div>
+          <div>
+            <Label>Details</Label>
+            <Textarea value={form.details} onChange={(e) => setForm({ ...form, details: e.target.value })} rows={2} placeholder="Details..." />
+          </div>
+          <div className="flex justify-end gap-2">
+            <Button variant="outline" size="sm" onClick={() => setShowForm(false)}>Cancel</Button>
+            <Button size="sm" onClick={handleAdd} disabled={saving}>{saving ? "Saving..." : "Save"}</Button>
+          </div>
+        </div>
+      )}
+
+      {/* List */}
+      {loading ? (
+        <p className="text-sm text-muted-foreground">Loading...</p>
+      ) : filtered.length === 0 ? (
+        <p className="text-sm text-muted-foreground">No activities found.</p>
+      ) : (
+        <div className="space-y-3">
+          {filtered.map((a: any) => (
+            <div key={a.id} className="bg-white border rounded-lg p-4 flex items-start gap-3">
+              <span className={`px-2 py-0.5 rounded text-xs font-medium shrink-0 ${typeColor[a.type] || "bg-gray-100 text-gray-600"}`}>
+                {a.type}
+              </span>
+              <div className="flex-1">
+                <p className="text-sm font-medium">{a.regarding}</p>
+                {a.details && <p className="text-sm text-muted-foreground mt-1">{a.details}</p>}
+                <p className="text-xs text-muted-foreground mt-1">{a.date} {a.time} · {a.recordManager}</p>
+              </div>
+              <button onClick={() => handleDelete(a.id)} className="text-muted-foreground hover:text-red-500 shrink-0">
+                <Trash2 className="w-4 h-4" />
+              </button>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
   );
 }

@@ -1,28 +1,12 @@
-import { useState } from "react";
-import { AppLayout } from "@/components/layout/AppLayout";
-import { Card, CardContent } from "@/components/ui/card";
+import { useEffect, useState } from "react";
+import { Link, useNavigate } from "react-router-dom";
+import { Eye, Pencil, Plus } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Badge } from "@/components/ui/badge";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { cases } from "@/data/mockData";
-import { formatDate, daysUntil } from "@/lib/formatters";
-import { FILE_STATUSES, CASE_TYPES } from "@/lib/constants";
-import { Link } from "react-router-dom";
-import { Plus, Eye, Pencil, Phone } from "lucide-react";
-import { cn } from "@/lib/utils";
+import { casesApi } from "@/lib/api";
 
-const statusColor: Record<string, string> = {
-  Active: "bg-success text-success-foreground",
-  Closed: "bg-muted text-muted-foreground",
-  Pending: "bg-warning text-warning-foreground",
-  "On Hold": "bg-muted text-muted-foreground",
-  Settled: "bg-primary text-primary-foreground",
-  Litigation: "bg-destructive text-destructive-foreground",
-  Mediation: "bg-warning text-warning-foreground",
-  Arbitration: "bg-destructive text-destructive-foreground",
-};
+const CASE_TYPES = ["All Case Types", "Motor Vehicle Accident (MVA)", "Slip and Fall", "Traffic Accident", "Immigration"];
+const STATUSES = ["All Statuses", "Active", "Closed", "Pending", "On Hold", "Settled", "Litigation", "Mediation", "Arbitration"];
 
 const caseTypeShort: Record<string, string> = {
   "Motor Vehicle Accident (MVA)": "MVA",
@@ -31,109 +15,171 @@ const caseTypeShort: Record<string, string> = {
   "Immigration": "Immigration",
 };
 
+function statusColor(status: string) {
+  const map: Record<string, string> = {
+    Active: "bg-green-100 text-green-700",
+    Pending: "bg-yellow-100 text-yellow-700",
+    Litigation: "bg-red-100 text-red-700",
+    Settled: "bg-blue-100 text-blue-700",
+    Closed: "bg-gray-100 text-gray-500",
+    Mediation: "bg-yellow-100 text-yellow-700",
+    Arbitration: "bg-red-100 text-red-700",
+    "On Hold": "bg-gray-100 text-gray-500",
+  };
+  return map[status] || "bg-gray-100 text-gray-500";
+}
+
+const PAGE_SIZE = 10;
+
 export default function Clients() {
+  const navigate = useNavigate();
+  const [cases, setCases] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
-  const [statusFilter, setStatusFilter] = useState("all");
-  const [caseTypeFilter, setCaseTypeFilter] = useState("all");
+  const [statusFilter, setStatusFilter] = useState("All Statuses");
+  const [typeFilter, setTypeFilter] = useState("All Case Types");
   const [page, setPage] = useState(1);
-  const perPage = 10;
 
-  const filtered = cases.filter((c) => {
-    const matchSearch = search === "" || `${c.client.firstName} ${c.client.lastName} ${c.fileNo}`.toLowerCase().includes(search.toLowerCase());
-    const matchStatus = statusFilter === "all" || c.fileStatus === statusFilter;
-    const matchType = caseTypeFilter === "all" || c.caseType === caseTypeFilter;
-    return matchSearch && matchStatus && matchType;
-  });
+  useEffect(() => {
+    async function load() {
+      setLoading(true);
+      try {
+        const data = await casesApi.getAll({
+          search: search || undefined,
+          status: statusFilter !== "All Statuses" ? statusFilter : undefined,
+          caseType: typeFilter !== "All Case Types" ? typeFilter : undefined,
+        });
+        setCases(data);
+        setPage(1);
+      } catch (err) {
+        console.error(err);
+      } finally {
+        setLoading(false);
+      }
+    }
+    const timer = setTimeout(load, 300);
+    return () => clearTimeout(timer);
+  }, [search, statusFilter, typeFilter]);
 
-  const totalPages = Math.ceil(filtered.length / perPage);
-  const paginated = filtered.slice((page - 1) * perPage, page * perPage);
+  const totalPages = Math.ceil(cases.length / PAGE_SIZE);
+  const paginated = cases.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
 
   return (
-    <AppLayout title="Clients">
-      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 mb-4">
-        <div className="flex items-center gap-3 flex-1 flex-wrap">
-          <Input placeholder="Search clients or file no..." value={search} onChange={(e) => { setSearch(e.target.value); setPage(1); }} className="max-w-xs h-9 text-sm" />
-          <Select value={statusFilter} onValueChange={(v) => { setStatusFilter(v); setPage(1); }}>
-            <SelectTrigger className="w-36 h-9 text-sm"><SelectValue placeholder="All Statuses" /></SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">All Statuses</SelectItem>
-              {FILE_STATUSES.map((s) => <SelectItem key={s} value={s}>{s}</SelectItem>)}
-            </SelectContent>
-          </Select>
-          <Select value={caseTypeFilter} onValueChange={(v) => { setCaseTypeFilter(v); setPage(1); }}>
-            <SelectTrigger className="w-44 h-9 text-sm"><SelectValue placeholder="All Case Types" /></SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">All Case Types</SelectItem>
-              {CASE_TYPES.map((t) => <SelectItem key={t} value={t}>{t}</SelectItem>)}
-            </SelectContent>
-          </Select>
-        </div>
-        <Button asChild size="sm">
-          <Link to="/clients/new"><Plus className="h-4 w-4 mr-1" /> New Client</Link>
+    <div className="space-y-4">
+      <div className="flex items-center justify-between">
+        <h1 className="text-2xl font-bold text-foreground">Clients</h1>
+        <Button onClick={() => navigate("/clients/new")} className="flex items-center gap-2">
+          <Plus className="w-4 h-4" /> New Client
         </Button>
       </div>
 
-      <Card>
-        <CardContent className="p-0">
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead className="text-xs">File No</TableHead>
-                <TableHead className="text-xs">Client Name</TableHead>
-                <TableHead className="text-xs">Phone</TableHead>
-                <TableHead className="text-xs">Case Type</TableHead>
-                <TableHead className="text-xs">Date of Loss</TableHead>
-                <TableHead className="text-xs">Status</TableHead>
-                <TableHead className="text-xs">Clerk Assigned</TableHead>
-                <TableHead className="text-xs">Limitation Date</TableHead>
-                <TableHead className="text-xs w-20">Actions</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {paginated.map((c) => {
-                const limDays = daysUntil(c.limitationDate);
-                return (
-                  <TableRow key={c.id} className="text-sm cursor-pointer hover:bg-muted/50">
-                    <TableCell className="py-2 font-medium">{c.fileNo}</TableCell>
-                    <TableCell className="py-2">{c.client.firstName} {c.client.lastName}</TableCell>
-                    <TableCell className="py-2">
-                      {c.client.phoneNumber ? (
-                        <a href={`tel:${c.client.phoneNumber}`} className="flex items-center gap-1 text-primary hover:underline">
-                          <Phone className="h-3 w-3" />
-                          <span className="text-xs">{c.client.phoneNumber}</span>
-                        </a>
-                      ) : <span className="text-muted-foreground text-xs">—</span>}
-                    </TableCell>
-                    <TableCell className="py-2">
-                      <Badge variant="outline" className="text-xs">{caseTypeShort[c.caseType] || c.caseType}</Badge>
-                    </TableCell>
-                    <TableCell className="py-2">{formatDate(c.dateOfLoss)}</TableCell>
-                    <TableCell className="py-2"><Badge className={cn("text-xs", statusColor[c.fileStatus])}>{c.fileStatus}</Badge></TableCell>
-                    <TableCell className="py-2">{c.clerkAssigned}</TableCell>
-                    <TableCell className={cn("py-2", limDays <= 7 && limDays >= 0 ? "text-destructive font-semibold" : limDays <= 30 && limDays > 7 ? "text-orange-500" : "")}>{formatDate(c.limitationDate)}</TableCell>
-                    <TableCell className="py-2">
-                      <div className="flex gap-1">
-                        <Button variant="ghost" size="icon" asChild className="h-7 w-7"><Link to={`/cases/${c.id}`}><Eye className="h-3.5 w-3.5" /></Link></Button>
-                        <Button variant="ghost" size="icon" asChild className="h-7 w-7"><Link to={`/cases/${c.id}`}><Pencil className="h-3.5 w-3.5" /></Link></Button>
-                      </div>
-                    </TableCell>
-                  </TableRow>
-                );
-              })}
-            </TableBody>
-          </Table>
-        </CardContent>
-      </Card>
+      {/* Filters */}
+      <div className="flex gap-3 flex-wrap">
+        <Input
+          placeholder="Search clients or file no..."
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+          className="w-64"
+        />
+        <select
+          value={statusFilter}
+          onChange={(e) => setStatusFilter(e.target.value)}
+          className="h-10 rounded-md border border-input bg-background px-3 text-sm"
+        >
+          {STATUSES.map((s) => <option key={s}>{s}</option>)}
+        </select>
+        <select
+          value={typeFilter}
+          onChange={(e) => setTypeFilter(e.target.value)}
+          className="h-10 rounded-md border border-input bg-background px-3 text-sm"
+        >
+          {CASE_TYPES.map((t) => <option key={t}>{t}</option>)}
+        </select>
+      </div>
 
+      {/* Table */}
+      <div className="bg-white rounded-lg border overflow-x-auto">
+        <table className="w-full text-sm">
+          <thead>
+            <tr className="border-b text-left text-muted-foreground">
+              <th className="px-4 py-3 font-medium">File No</th>
+              <th className="px-4 py-3 font-medium">Client Name</th>
+              <th className="px-4 py-3 font-medium">Phone</th>
+              <th className="px-4 py-3 font-medium">Case Type</th>
+              <th className="px-4 py-3 font-medium">Date of Loss</th>
+              <th className="px-4 py-3 font-medium">Status</th>
+              <th className="px-4 py-3 font-medium">Clerk Assigned</th>
+              <th className="px-4 py-3 font-medium">Limitation Date</th>
+              <th className="px-4 py-3 font-medium">Actions</th>
+            </tr>
+          </thead>
+          <tbody>
+            {loading ? (
+              <tr>
+                <td colSpan={9} className="px-4 py-8 text-center text-muted-foreground">Loading...</td>
+              </tr>
+            ) : paginated.length === 0 ? (
+              <tr>
+                <td colSpan={9} className="px-4 py-8 text-center text-muted-foreground">No clients found.</td>
+              </tr>
+            ) : (
+              paginated.map((c: any) => (
+                <tr key={c.id} className="border-b hover:bg-muted/30">
+                  <td className="px-4 py-3 font-mono text-xs">{c.fileNo}</td>
+                  <td className="px-4 py-3 font-medium">
+                    {c.client?.firstName} {c.client?.lastName}
+                  </td>
+                  <td className="px-4 py-3">
+                    {c.client?.phoneNumber ? (
+                      <a href={`tel:${c.client.phoneNumber}`} className="text-blue-600 hover:underline">
+                        {c.client.phoneNumber}
+                      </a>
+                    ) : "—"}
+                  </td>
+                  <td className="px-4 py-3">
+                    <span className="px-2 py-0.5 rounded text-xs font-medium bg-orange-100 text-orange-700">
+                      {caseTypeShort[c.caseType] || c.caseType}
+                    </span>
+                  </td>
+                  <td className="px-4 py-3 text-muted-foreground">{c.dateOfLoss || "—"}</td>
+                  <td className="px-4 py-3">
+                    <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${statusColor(c.fileStatus)}`}>
+                      {c.fileStatus}
+                    </span>
+                  </td>
+                  <td className="px-4 py-3 text-muted-foreground">{c.clerkAssigned || "—"}</td>
+                  <td className="px-4 py-3 text-xs text-muted-foreground">{c.limitationDate || "—"}</td>
+                  <td className="px-4 py-3 flex gap-2">
+                    <Link to={`/cases/${c.id}`} className="text-muted-foreground hover:text-foreground">
+                      <Eye className="w-4 h-4" />
+                    </Link>
+                    <Link to={`/cases/${c.id}`} className="text-muted-foreground hover:text-foreground">
+                      <Pencil className="w-4 h-4" />
+                    </Link>
+                  </td>
+                </tr>
+              ))
+            )}
+          </tbody>
+        </table>
+      </div>
+
+      {/* Pagination */}
       {totalPages > 1 && (
-        <div className="flex items-center justify-between mt-4">
-          <p className="text-sm text-muted-foreground">Showing {(page - 1) * perPage + 1}–{Math.min(page * perPage, filtered.length)} of {filtered.length}</p>
-          <div className="flex gap-1">
-            <Button variant="outline" size="sm" disabled={page === 1} onClick={() => setPage(page - 1)}>Previous</Button>
-            <Button variant="outline" size="sm" disabled={page === totalPages} onClick={() => setPage(page + 1)}>Next</Button>
+        <div className="flex items-center justify-between">
+          <p className="text-sm text-muted-foreground">
+            Showing {(page - 1) * PAGE_SIZE + 1}–{Math.min(page * PAGE_SIZE, cases.length)} of {cases.length}
+          </p>
+          <div className="flex gap-2">
+            <Button variant="outline" size="sm" disabled={page === 1} onClick={() => setPage(page - 1)}>
+              Previous
+            </Button>
+            <Button variant="outline" size="sm" disabled={page === totalPages} onClick={() => setPage(page + 1)}>
+              Next
+            </Button>
           </div>
         </div>
       )}
-    </AppLayout>
+    </div>
   );
 }
