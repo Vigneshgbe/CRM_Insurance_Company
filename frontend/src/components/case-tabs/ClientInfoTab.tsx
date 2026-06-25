@@ -5,25 +5,24 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
-import { formatCurrency, maskSIN } from "@/lib/formatters";
+import { maskSIN } from "@/lib/formatters";
 import { Eye, EyeOff } from "lucide-react";
 import { API_BASE_URL } from "@/lib/constants";
+
 function getToken() {
   return localStorage.getItem("crm_token") || localStorage.getItem("token") || "";
 }
-
 
 export default function ClientInfoTab({ caseId }: { caseId: string }) {
   const { toast } = useToast();
   const [loading, setLoading] = useState(false);
   const [fetching, setFetching] = useState(true);
   const [showSIN, setShowSIN] = useState(false);
-  const [sinValue, setSinValue] = useState("");
 
-  const { register, handleSubmit, reset } = useForm({
+  const { register, handleSubmit, watch, reset } = useForm({
     defaultValues: {
-      driverLicense: "", ohipNumber: "",
-      sinNumber: "", citizenId: "", prCardNo: "", passportNo: "",
+      driverLicense: "", ohipNumber: "", sinNumber: "",
+      citizenId: "", prCardNo: "", passportNo: "",
       child1Name: "", child1DOB: "", child2Name: "", child2DOB: "",
       child3Name: "", child3DOB: "", child4Name: "", child4DOB: "",
       child5Name: "", child5DOB: "", child6Name: "", child6DOB: "",
@@ -36,27 +35,26 @@ export default function ClientInfoTab({ caseId }: { caseId: string }) {
     },
   });
 
+  // ── Load real data on mount ────────────────────────────────────────────────
   useEffect(() => {
-    const token = getToken();
     fetch(`${API_BASE_URL}/cases/${caseId}/client-info`, {
-      headers: { Authorization: `Bearer ${token}` },
+      headers: { Authorization: `Bearer ${getToken()}` },
     })
-      .then((r) => r.json())
+      .then((r) => r.ok ? r.json() : {})
       .then((data) => {
-        reset(data);
-        if (data.sinNumber) setSinValue(data.sinNumber);
+        if (data && Object.keys(data).length > 0) reset(data);
       })
       .catch(() => toast({ title: "Failed to load client info", variant: "destructive" }))
       .finally(() => setFetching(false));
   }, [caseId]);
 
+  // ── Save to DB ─────────────────────────────────────────────────────────────
   const onSubmit = async (data: any) => {
     setLoading(true);
     try {
-      const token = getToken();
       const res = await fetch(`${API_BASE_URL}/cases/${caseId}/client-info`, {
         method: "POST",
-        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${getToken()}` },
         body: JSON.stringify(data),
       });
       if (!res.ok) throw new Error();
@@ -71,6 +69,8 @@ export default function ClientInfoTab({ caseId }: { caseId: string }) {
   const F = ({ label, name, type = "text" }: { label: string; name: string; type?: string }) => (
     <div><Label className="text-xs">{label}</Label><Input {...register(name as any)} type={type} className="h-8 text-xs mt-1" /></div>
   );
+
+  const sinValue = watch("sinNumber");
 
   if (fetching) return <div className="p-6 text-sm text-muted-foreground">Loading...</div>;
 
@@ -87,11 +87,23 @@ export default function ClientInfoTab({ caseId }: { caseId: string }) {
                 <div>
                   <Label className="text-xs">SIN Number</Label>
                   <div className="flex gap-1 mt-1">
-                    <Input value={showSIN ? sinValue : maskSIN(sinValue)} readOnly className="h-8 text-xs" />
-                    <Button type="button" variant="ghost" size="icon" className="h-8 w-8 shrink-0" onClick={() => setShowSIN(!showSIN)}>
+                    <Input
+                      value={showSIN ? sinValue : maskSIN(sinValue)}
+                      readOnly
+                      className="h-8 text-xs"
+                    />
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="icon"
+                      className="h-8 w-8 shrink-0"
+                      onClick={() => setShowSIN(!showSIN)}
+                    >
                       {showSIN ? <EyeOff className="h-3.5 w-3.5" /> : <Eye className="h-3.5 w-3.5" />}
                     </Button>
                   </div>
+                  {/* Hidden field so sinNumber is included in form submission */}
+                  <input type="hidden" {...register("sinNumber")} />
                 </div>
                 <F label="Citizen ID" name="citizenId" />
                 <F label="PR Card No" name="prCardNo" />
