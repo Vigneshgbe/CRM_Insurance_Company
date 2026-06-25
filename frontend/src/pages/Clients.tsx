@@ -1,12 +1,19 @@
-import { useEffect, useState } from "react";
-import { Link, useNavigate } from "react-router-dom";
-import { Eye, Pencil, Plus } from "lucide-react";
+import { useState, useEffect } from "react";
+import { AppLayout } from "@/components/layout/AppLayout";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { formatDate, daysUntil } from "@/lib/formatters";
+import { Link, useNavigate } from "react-router-dom";
+import { cn } from "@/lib/utils";
+import { Eye, Phone, Plus } from "lucide-react";
 import { casesApi } from "@/lib/api";
 
-const CASE_TYPES = ["All Case Types", "Motor Vehicle Accident (MVA)", "Slip and Fall", "Traffic Accident", "Immigration"];
-const STATUSES = ["All Statuses", "Active", "Closed", "Pending", "On Hold", "Settled", "Litigation", "Mediation", "Arbitration"];
+const FILE_STATUSES = ["Active", "Closed", "Pending", "On Hold", "Settled", "Litigation", "Mediation", "Arbitration"];
+const CASE_TYPES = ["Motor Vehicle Accident (MVA)", "Slip and Fall", "Traffic Accident", "Immigration"];
 
 const caseTypeShort: Record<string, string> = {
   "Motor Vehicle Accident (MVA)": "MVA",
@@ -15,19 +22,16 @@ const caseTypeShort: Record<string, string> = {
   "Immigration": "Immigration",
 };
 
-function statusColor(status: string) {
-  const map: Record<string, string> = {
-    Active: "bg-green-100 text-green-700",
-    Pending: "bg-yellow-100 text-yellow-700",
-    Litigation: "bg-red-100 text-red-700",
-    Settled: "bg-blue-100 text-blue-700",
-    Closed: "bg-gray-100 text-gray-500",
-    Mediation: "bg-yellow-100 text-yellow-700",
-    Arbitration: "bg-red-100 text-red-700",
-    "On Hold": "bg-gray-100 text-gray-500",
-  };
-  return map[status] || "bg-gray-100 text-gray-500";
-}
+const statusColor: Record<string, string> = {
+  Active: "bg-success text-success-foreground",
+  Closed: "bg-muted text-muted-foreground",
+  Pending: "bg-warning text-warning-foreground",
+  "On Hold": "bg-muted text-muted-foreground",
+  Settled: "bg-primary text-primary-foreground",
+  Litigation: "bg-destructive text-destructive-foreground",
+  Mediation: "bg-warning text-warning-foreground",
+  Arbitration: "bg-destructive text-destructive-foreground",
+};
 
 const PAGE_SIZE = 10;
 
@@ -36,18 +40,18 @@ export default function Clients() {
   const [cases, setCases] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
-  const [statusFilter, setStatusFilter] = useState("All Statuses");
-  const [typeFilter, setTypeFilter] = useState("All Case Types");
+  const [statusFilter, setStatusFilter] = useState("all");
+  const [typeFilter, setTypeFilter] = useState("all");
   const [page, setPage] = useState(1);
 
   useEffect(() => {
-    async function load() {
+    const timer = setTimeout(async () => {
       setLoading(true);
       try {
         const data = await casesApi.getAll({
           search: search || undefined,
-          status: statusFilter !== "All Statuses" ? statusFilter : undefined,
-          caseType: typeFilter !== "All Case Types" ? typeFilter : undefined,
+          status: statusFilter !== "all" ? statusFilter : undefined,
+          caseType: typeFilter !== "all" ? typeFilter : undefined,
         });
         setCases(data);
         setPage(1);
@@ -56,8 +60,7 @@ export default function Clients() {
       } finally {
         setLoading(false);
       }
-    }
-    const timer = setTimeout(load, 300);
+    }, 300);
     return () => clearTimeout(timer);
   }, [search, statusFilter, typeFilter]);
 
@@ -65,121 +68,105 @@ export default function Clients() {
   const paginated = cases.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
 
   return (
-    <div className="space-y-4">
-      <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-bold text-foreground">Clients</h1>
-        <Button onClick={() => navigate("/clients/new")} className="flex items-center gap-2">
-          <Plus className="w-4 h-4" /> New Client
+    <AppLayout title="Clients">
+      <div className="flex items-center justify-between mb-4">
+        <div className="flex gap-3 flex-wrap">
+          <Input
+            placeholder="Search clients or file no..."
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            className="w-64 h-9 text-sm"
+          />
+          <Select value={statusFilter} onValueChange={setStatusFilter}>
+            <SelectTrigger className="w-40 h-9 text-sm">
+              <SelectValue placeholder="All Statuses" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All Statuses</SelectItem>
+              {FILE_STATUSES.map((s) => <SelectItem key={s} value={s}>{s}</SelectItem>)}
+            </SelectContent>
+          </Select>
+          <Select value={typeFilter} onValueChange={setTypeFilter}>
+            <SelectTrigger className="w-44 h-9 text-sm">
+              <SelectValue placeholder="All Case Types" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All Case Types</SelectItem>
+              {CASE_TYPES.map((t) => <SelectItem key={t} value={t}>{t}</SelectItem>)}
+            </SelectContent>
+          </Select>
+        </div>
+        <Button size="sm" onClick={() => navigate("/clients/new")}>
+          <Plus className="h-4 w-4 mr-1" /> New Client
         </Button>
       </div>
 
-      {/* Filters */}
-      <div className="flex gap-3 flex-wrap">
-        <Input
-          placeholder="Search clients or file no..."
-          value={search}
-          onChange={(e) => setSearch(e.target.value)}
-          className="w-64"
-        />
-        <select
-          value={statusFilter}
-          onChange={(e) => setStatusFilter(e.target.value)}
-          className="h-10 rounded-md border border-input bg-background px-3 text-sm"
-        >
-          {STATUSES.map((s) => <option key={s}>{s}</option>)}
-        </select>
-        <select
-          value={typeFilter}
-          onChange={(e) => setTypeFilter(e.target.value)}
-          className="h-10 rounded-md border border-input bg-background px-3 text-sm"
-        >
-          {CASE_TYPES.map((t) => <option key={t}>{t}</option>)}
-        </select>
-      </div>
+      <Card>
+        <CardContent className="p-0">
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead className="text-xs">File No</TableHead>
+                <TableHead className="text-xs">Client Name</TableHead>
+                <TableHead className="text-xs">Phone</TableHead>
+                <TableHead className="text-xs">Case Type</TableHead>
+                <TableHead className="text-xs">Date of Loss</TableHead>
+                <TableHead className="text-xs">Status</TableHead>
+                <TableHead className="text-xs">Clerk Assigned</TableHead>
+                <TableHead className="text-xs">Limitation Date</TableHead>
+                <TableHead className="text-xs w-16"></TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {loading ? (
+                <TableRow><TableCell colSpan={9} className="text-center text-muted-foreground py-8">Loading...</TableCell></TableRow>
+              ) : paginated.length === 0 ? (
+                <TableRow><TableCell colSpan={9} className="text-center text-muted-foreground py-8">No clients found.</TableCell></TableRow>
+              ) : (
+                paginated.map((c: any) => (
+                  <TableRow key={c.id} className="text-sm">
+                    <TableCell className="py-2 font-medium">{c.fileNo}</TableCell>
+                    <TableCell className="py-2">{c.client?.firstName} {c.client?.lastName}</TableCell>
+                    <TableCell className="py-2">
+                      {c.client?.phoneNumber ? (
+                        <a href={`tel:${c.client.phoneNumber}`} className="flex items-center gap-1 text-primary hover:underline">
+                          <Phone className="h-3 w-3" />{c.client.phoneNumber}
+                        </a>
+                      ) : "—"}
+                    </TableCell>
+                    <TableCell className="py-2">
+                      <Badge variant="outline" className="text-xs">{caseTypeShort[c.caseType] || c.caseType}</Badge>
+                    </TableCell>
+                    <TableCell className="py-2">{formatDate(c.dateOfLoss)}</TableCell>
+                    <TableCell className="py-2">
+                      <Badge className={cn("text-xs", statusColor[c.fileStatus])}>{c.fileStatus}</Badge>
+                    </TableCell>
+                    <TableCell className="py-2">{c.clerkAssigned || "—"}</TableCell>
+                    <TableCell className="py-2 text-xs">{formatDate(c.limitationDate)}</TableCell>
+                    <TableCell className="py-2">
+                      <Button variant="ghost" size="icon" asChild className="h-7 w-7">
+                        <Link to={`/cases/${c.id}`}><Eye className="h-3.5 w-3.5" /></Link>
+                      </Button>
+                    </TableCell>
+                  </TableRow>
+                ))
+              )}
+            </TableBody>
+          </Table>
+        </CardContent>
+      </Card>
 
-      {/* Table */}
-      <div className="bg-white rounded-lg border overflow-x-auto">
-        <table className="w-full text-sm">
-          <thead>
-            <tr className="border-b text-left text-muted-foreground">
-              <th className="px-4 py-3 font-medium">File No</th>
-              <th className="px-4 py-3 font-medium">Client Name</th>
-              <th className="px-4 py-3 font-medium">Phone</th>
-              <th className="px-4 py-3 font-medium">Case Type</th>
-              <th className="px-4 py-3 font-medium">Date of Loss</th>
-              <th className="px-4 py-3 font-medium">Status</th>
-              <th className="px-4 py-3 font-medium">Clerk Assigned</th>
-              <th className="px-4 py-3 font-medium">Limitation Date</th>
-              <th className="px-4 py-3 font-medium">Actions</th>
-            </tr>
-          </thead>
-          <tbody>
-            {loading ? (
-              <tr>
-                <td colSpan={9} className="px-4 py-8 text-center text-muted-foreground">Loading...</td>
-              </tr>
-            ) : paginated.length === 0 ? (
-              <tr>
-                <td colSpan={9} className="px-4 py-8 text-center text-muted-foreground">No clients found.</td>
-              </tr>
-            ) : (
-              paginated.map((c: any) => (
-                <tr key={c.id} className="border-b hover:bg-muted/30">
-                  <td className="px-4 py-3 font-mono text-xs">{c.fileNo}</td>
-                  <td className="px-4 py-3 font-medium">
-                    {c.client?.firstName} {c.client?.lastName}
-                  </td>
-                  <td className="px-4 py-3">
-                    {c.client?.phoneNumber ? (
-                      <a href={`tel:${c.client.phoneNumber}`} className="text-blue-600 hover:underline">
-                        {c.client.phoneNumber}
-                      </a>
-                    ) : "—"}
-                  </td>
-                  <td className="px-4 py-3">
-                    <span className="px-2 py-0.5 rounded text-xs font-medium bg-orange-100 text-orange-700">
-                      {caseTypeShort[c.caseType] || c.caseType}
-                    </span>
-                  </td>
-                  <td className="px-4 py-3 text-muted-foreground">{c.dateOfLoss || "—"}</td>
-                  <td className="px-4 py-3">
-                    <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${statusColor(c.fileStatus)}`}>
-                      {c.fileStatus}
-                    </span>
-                  </td>
-                  <td className="px-4 py-3 text-muted-foreground">{c.clerkAssigned || "—"}</td>
-                  <td className="px-4 py-3 text-xs text-muted-foreground">{c.limitationDate || "—"}</td>
-                  <td className="px-4 py-3 flex gap-2">
-                    <Link to={`/cases/${c.id}`} className="text-muted-foreground hover:text-foreground">
-                      <Eye className="w-4 h-4" />
-                    </Link>
-                    <Link to={`/cases/${c.id}`} className="text-muted-foreground hover:text-foreground">
-                      <Pencil className="w-4 h-4" />
-                    </Link>
-                  </td>
-                </tr>
-              ))
-            )}
-          </tbody>
-        </table>
-      </div>
-
-      {/* Pagination */}
       {totalPages > 1 && (
-        <div className="flex items-center justify-between">
+        <div className="flex items-center justify-between mt-4">
           <p className="text-sm text-muted-foreground">
             Showing {(page - 1) * PAGE_SIZE + 1}–{Math.min(page * PAGE_SIZE, cases.length)} of {cases.length}
           </p>
           <div className="flex gap-2">
-            <Button variant="outline" size="sm" disabled={page === 1} onClick={() => setPage(page - 1)}>
-              Previous
-            </Button>
-            <Button variant="outline" size="sm" disabled={page === totalPages} onClick={() => setPage(page + 1)}>
-              Next
-            </Button>
+            <Button variant="outline" size="sm" disabled={page === 1} onClick={() => setPage(page - 1)}>Previous</Button>
+            <Button variant="outline" size="sm" disabled={page === totalPages} onClick={() => setPage(page + 1)}>Next</Button>
           </div>
         </div>
       )}
-    </div>
+    </AppLayout>
   );
 }
