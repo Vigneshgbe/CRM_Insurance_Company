@@ -13,7 +13,7 @@ import { getThirdParty, upsertThirdParty } from '../controllers/third-party.cont
 import { getNoFault, upsertNoFault } from '../controllers/no-fault.controller';
 import { getMedical, upsertMedical } from '../controllers/medical.controller';
 import { getEmployment, upsertEmployment } from '../controllers/employment.controller';
-import { getDocumentsByCaseId, uploadDocument, getAllDocuments, deleteDocument, renameDocument } from '../controllers/documents.controller';
+import { getDocumentsByCase, uploadDocument, getAllDocuments, deleteDocument, renameDocument, upload as docUpload } from '../controllers/documents.controller';
 import pool from '../config/database';
 import crypto from 'crypto';
 import bcrypt from 'bcryptjs';
@@ -320,8 +320,8 @@ router.post('/cases/:caseId/client-info', authenticate, async (req: any, res: an
 });
 
 // ── Documents ─────────────────────────────────────────────────────────────────
-router.get('/cases/:caseId/documents', authenticate, getDocumentsByCaseId);
-router.post('/cases/:caseId/documents', authenticate, uploadDocument);
+router.get('/cases/:caseId/documents', authenticate, getDocumentsByCase);
+router.post('/cases/:caseId/documents', authenticate, docUpload.single('file'), uploadDocument);
 router.get('/documents', authenticate, getAllDocuments);
 router.delete('/documents/:id', authenticate, deleteDocument);
 router.put('/documents/:id', authenticate, renameDocument);
