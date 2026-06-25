@@ -2,7 +2,8 @@ import { Search, Bell, ChevronDown, Menu } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
+import { useAuth } from "@/lib/auth";
 
 interface AppHeaderProps {
   title: string;
@@ -10,6 +11,17 @@ interface AppHeaderProps {
 }
 
 export function AppHeader({ title, onToggleMobile }: AppHeaderProps) {
+  const { user, logout } = useAuth();
+  const navigate = useNavigate();
+
+  const displayName = user?.name || "Staff";
+  const initials = displayName.split(" ").map((n: string) => n[0]).join("").slice(0, 2).toUpperCase();
+
+  function handleLogout() {
+    logout();
+    navigate("/login");
+  }
+
   return (
     <header className="h-14 border-b bg-background flex items-center justify-between px-6 shrink-0">
       <div className="flex items-center gap-4">
@@ -30,14 +42,16 @@ export function AppHeader({ title, onToggleMobile }: AppHeaderProps) {
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
             <Button variant="ghost" className="gap-2 h-9 px-2">
-              <div className="h-7 w-7 rounded-full bg-primary flex items-center justify-center text-xs font-semibold text-primary-foreground">AS</div>
-              <span className="text-sm hidden sm:inline">Amanda Singh</span>
+              <div className="h-7 w-7 rounded-full bg-primary flex items-center justify-center text-xs font-semibold text-primary-foreground">
+                {initials}
+              </div>
+              <span className="text-sm hidden sm:inline">{displayName}</span>
               <ChevronDown className="h-3 w-3" />
             </Button>
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end">
             <DropdownMenuItem asChild><Link to="/settings">Settings</Link></DropdownMenuItem>
-            <DropdownMenuItem asChild><Link to="/login">Sign Out</Link></DropdownMenuItem>
+            <DropdownMenuItem onClick={handleLogout} className="text-destructive">Sign Out</DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>
       </div>
