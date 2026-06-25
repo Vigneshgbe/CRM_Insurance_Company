@@ -1,151 +1,120 @@
-import { useEffect, useState } from "react";
+import { useState, useEffect } from "react";
+import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
-import { activitiesApi } from "@/lib/api";
-import { useAuth } from "@/lib/auth";
+import { Textarea } from "@/components/ui/textarea";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Badge } from "@/components/ui/badge";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { useToast } from "@/hooks/use-toast";
-import { Trash2 } from "lucide-react";
+import { formatDate } from "@/lib/formatters";
+import { Plus, Trash2 } from "lucide-react";
+import { useAuth } from "@/lib/auth";
 
-const ACTIVITY_TYPES = ["Note", "Task", "Call", "Email", "Appointment"];
+const API = "http://localhost:5000/api";
+const token = () => localStorage.getItem("crm_token") || "";
+const TYPES = ["Note","Task","Call","Email","Appointment"];
 
-interface Props { caseId: string; }
-
-export default function ActivitiesTab({ caseId }: Props) {
-  const { user } = useAuth();
+export default function ActivitiesTab({ caseId }: { caseId: string }) {
   const { toast } = useToast();
+  const { user } = useAuth();
   const [activities, setActivities] = useState<any[]>([]);
-  const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState("All");
-  const [showForm, setShowForm] = useState(false);
-  const [form, setForm] = useState({ type: "Call", regarding: "", details: "" });
+  const [open, setOpen] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [form, setForm] = useState({ type: "Note", regarding: "", details: "", date: new Date().toISOString().slice(0,10), time: new Date().toTimeString().slice(0,5) });
+
+  async function load() {
+    const r = await fetch(`${API}/cases/${caseId}/activities`, { headers: { Authorization: `Bearer ${token()}` } });
+    if (r.ok) setActivities(await r.json());
+  }
 
   useEffect(() => { load(); }, [caseId]);
 
-  async function load() {
-    setLoading(true);
-    try {
-      const data = await activitiesApi.getByCaseId(caseId);
-      setActivities(data);
-    } catch (err) { console.error(err); }
-    finally { setLoading(false); }
-  }
-
-  async function handleAdd() {
-    if (!form.regarding.trim()) { toast({ title: "Regarding field required", variant: "destructive" }); return; }
+  async function addActivity() {
     setSaving(true);
     try {
-      const now = new Date();
-      await activitiesApi.create(caseId, {
-        date: now.toISOString().slice(0, 10),
-        time: now.toTimeString().slice(0, 5),
-        type: form.type,
-        regarding: form.regarding,
-        details: form.details,
-        recordManager: user?.name || "System",
-        companyGroup: "Internal",
+      const r = await fetch(`${API}/cases/${caseId}/activities`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token()}` },
+        body: JSON.stringify({ ...form, recordManager: user?.name || "Staff", companyGroup: "Internal" }),
       });
-      setForm({ type: "Call", regarding: "", details: "" });
-      setShowForm(false);
+      if (!r.ok) throw new Error();
       toast({ title: "Activity added" });
-      load();
-    } catch (err) {
-      toast({ title: "Failed to save", variant: "destructive" });
-    } finally { setSaving(false); }
+      setForm({ type: "Note", regarding: "", details: "", date: new Date().toISOString().slice(0,10), time: new Date().toTimeString().slice(0,5) });
+      setOpen(false); load();
+    } catch { toast({ title: "Failed", variant: "destructive" }); }
+    finally { setSaving(false); }
   }
 
-  async function handleDelete(id: string) {
-    if (!confirm("Delete this activity?")) return;
-    await activitiesApi.delete(caseId, id);
-    toast({ title: "Deleted" });
+  async function deleteActivity(id: string) {
+    if (!confirm("Delete?")) return;
+    await fetch(`${API}/cases/${caseId}/activities/${id}`, { method: "DELETE", headers: { Authorization: `Bearer ${token()}` } });
     load();
   }
 
-  const typeColor: Record<string, string> = {
-    Note: "bg-gray-100 text-gray-600",
-    Task: "bg-purple-100 text-purple-700",
-    Call: "bg-blue-100 text-blue-700",
-    Email: "bg-green-100 text-green-700",
-    Appointment: "bg-orange-100 text-orange-700",
-  };
-
-  const filtered = filter === "All" ? activities : activities.filter((a) => a.type === filter);
+  const filtered = filter === "All" ? activities : activities.filter(a => a.type === filter);
 
   return (
-    <div className="space-y-4 p-4">
-      {/* Controls */}
-      <div className="flex items-center justify-between flex-wrap gap-2">
-        <div className="flex gap-2 flex-wrap">
-          {["All", ...ACTIVITY_TYPES].map((t) => (
-            <button
-              key={t}
-              onClick={() => setFilter(t)}
-              className={`px-3 py-1 rounded-full text-xs font-medium border transition-colors ${filter === t ? "bg-primary text-white border-primary" : "bg-white text-muted-foreground border-border hover:border-primary"}`}
-            >
-              {t}
-            </button>
+    <div className="p-4">
+      <div className="flex items-center justify-between mb-3 flex-wrap gap-2">
+        <div className="flex gap-1 flex-wrap">
+          {["All", ...TYPES].map(t => (
+            <Button key={t} size="sm" variant={filter === t ? "default" : "outline"} className="h-7 text-xs" onClick={() => setFilter(t)}>{t}</Button>
           ))}
         </div>
-        <Button size="sm" onClick={() => setShowForm(!showForm)}>+ Add Activity</Button>
-      </div>
-
-      {/* Add form */}
-      {showForm && (
-        <div className="bg-white border rounded-lg p-4 space-y-3">
-          <h3 className="font-medium text-sm">New Activity</h3>
-          <div className="grid grid-cols-2 gap-3">
-            <div>
-              <Label>Type</Label>
-              <select
-                value={form.type}
-                onChange={(e) => setForm({ ...form, type: e.target.value })}
-                className="h-10 w-full rounded-md border border-input bg-background px-3 text-sm"
-              >
-                {ACTIVITY_TYPES.map((t) => <option key={t}>{t}</option>)}
-              </select>
-            </div>
-            <div>
-              <Label>Regarding</Label>
-              <Input value={form.regarding} onChange={(e) => setForm({ ...form, regarding: e.target.value })} placeholder="Subject..." />
-            </div>
-          </div>
-          <div>
-            <Label>Details</Label>
-            <Textarea value={form.details} onChange={(e) => setForm({ ...form, details: e.target.value })} rows={2} placeholder="Details..." />
-          </div>
-          <div className="flex justify-end gap-2">
-            <Button variant="outline" size="sm" onClick={() => setShowForm(false)}>Cancel</Button>
-            <Button size="sm" onClick={handleAdd} disabled={saving}>{saving ? "Saving..." : "Save"}</Button>
-          </div>
-        </div>
-      )}
-
-      {/* List */}
-      {loading ? (
-        <p className="text-sm text-muted-foreground">Loading...</p>
-      ) : filtered.length === 0 ? (
-        <p className="text-sm text-muted-foreground">No activities found.</p>
-      ) : (
-        <div className="space-y-3">
-          {filtered.map((a: any) => (
-            <div key={a.id} className="bg-white border rounded-lg p-4 flex items-start gap-3">
-              <span className={`px-2 py-0.5 rounded text-xs font-medium shrink-0 ${typeColor[a.type] || "bg-gray-100 text-gray-600"}`}>
-                {a.type}
-              </span>
-              <div className="flex-1">
-                <p className="text-sm font-medium">{a.regarding}</p>
-                {a.details && <p className="text-sm text-muted-foreground mt-1">{a.details}</p>}
-                <p className="text-xs text-muted-foreground mt-1">{a.date} {a.time} · {a.recordManager}</p>
+        <Dialog open={open} onOpenChange={setOpen}>
+          <DialogTrigger asChild>
+            <Button size="sm"><Plus className="h-4 w-4 mr-1" />Add Activity</Button>
+          </DialogTrigger>
+          <DialogContent>
+            <DialogHeader><DialogTitle>Add Activity</DialogTitle></DialogHeader>
+            <div className="space-y-3 pt-1">
+              <div>
+                <Label className="text-xs">Type</Label>
+                <Select value={form.type} onValueChange={v => setForm(f => ({...f, type: v}))}>
+                  <SelectTrigger className="mt-1 h-9"><SelectValue /></SelectTrigger>
+                  <SelectContent>{TYPES.map(t => <SelectItem key={t} value={t}>{t}</SelectItem>)}</SelectContent>
+                </Select>
               </div>
-              <button onClick={() => handleDelete(a.id)} className="text-muted-foreground hover:text-red-500 shrink-0">
-                <Trash2 className="w-4 h-4" />
-              </button>
+              <div className="grid grid-cols-2 gap-3">
+                <div><Label className="text-xs">Date</Label><Input type="date" value={form.date} onChange={e => setForm(f=>({...f,date:e.target.value}))} className="mt-1 h-9" /></div>
+                <div><Label className="text-xs">Time</Label><Input type="time" value={form.time} onChange={e => setForm(f=>({...f,time:e.target.value}))} className="mt-1 h-9" /></div>
+              </div>
+              <div><Label className="text-xs">Regarding</Label><Input value={form.regarding} onChange={e => setForm(f=>({...f,regarding:e.target.value}))} className="mt-1 h-9" /></div>
+              <div><Label className="text-xs">Details</Label><Textarea value={form.details} onChange={e => setForm(f=>({...f,details:e.target.value}))} className="mt-1" rows={4} /></div>
+              <div className="flex justify-end gap-2">
+                <Button variant="outline" onClick={() => setOpen(false)}>Cancel</Button>
+                <Button onClick={addActivity} disabled={saving}>{saving ? "Saving..." : "Save"}</Button>
+              </div>
             </div>
-          ))}
-        </div>
-      )}
+          </DialogContent>
+        </Dialog>
+      </div>
+      <div className="space-y-3">
+        {filtered.length === 0 ? (
+          <p className="text-sm text-muted-foreground text-center py-8">No activities yet.</p>
+        ) : filtered.map((a: any) => (
+          <Card key={a.id}>
+            <CardContent className="p-4">
+              <div className="flex items-start justify-between gap-2">
+                <div className="flex-1">
+                  <div className="flex items-center gap-2 mb-1">
+                    <Badge variant="outline" className="text-xs">{a.type}</Badge>
+                    <span className="text-xs text-muted-foreground">{formatDate(a.date)} {a.time && `· ${a.time}`} · {a.recordManager}</span>
+                  </div>
+                  {a.regarding && <p className="text-sm font-medium">{a.regarding}</p>}
+                  {a.details && <p className="text-sm text-muted-foreground mt-0.5">{a.details}</p>}
+                </div>
+                <Button variant="ghost" size="icon" className="h-7 w-7 shrink-0 text-muted-foreground hover:text-destructive" onClick={() => deleteActivity(a.id)}>
+                  <Trash2 className="h-3.5 w-3.5" />
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
+        ))}
+      </div>
     </div>
   );
 }

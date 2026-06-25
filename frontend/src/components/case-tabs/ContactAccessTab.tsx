@@ -1,125 +1,111 @@
-import { useEffect, useState } from "react";
+import { useState, useEffect } from "react";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { contactAccessApi } from "@/lib/api";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { useToast } from "@/hooks/use-toast";
-import { Trash2 } from "lucide-react";
+import { formatDate } from "@/lib/formatters";
+import { Plus, Trash2 } from "lucide-react";
 
-interface Props { caseId: string; }
+const API = "http://localhost:5000/api";
+const token = () => localStorage.getItem("crm_token") || "";
 
-export default function ContactAccessTab({ caseId }: Props) {
+export default function ContactAccessTab({ caseId }: { caseId: string }) {
   const { toast } = useToast();
   const [contacts, setContacts] = useState<any[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [showForm, setShowForm] = useState(false);
-  const [form, setForm] = useState({ name: "", role: "", accessLevel: "Read Only" });
+  const [open, setOpen] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [form, setForm] = useState({ name: "", role: "", accessLevel: "Read Only", dateAdded: new Date().toISOString().slice(0,10) });
+
+  async function load() {
+    const r = await fetch(`${API}/cases/${caseId}/contact-access`, { headers: { Authorization: `Bearer ${token()}` } });
+    if (r.ok) setContacts(await r.json());
+  }
 
   useEffect(() => { load(); }, [caseId]);
 
-  async function load() {
-    setLoading(true);
-    try { setContacts(await contactAccessApi.getByCaseId(caseId)); }
-    catch (err) { console.error(err); }
-    finally { setLoading(false); }
-  }
-
-  async function handleAdd() {
-    if (!form.name) { toast({ title: "Name required", variant: "destructive" }); return; }
+  async function addContact() {
+    if (!form.name.trim()) return;
     setSaving(true);
     try {
-      await contactAccessApi.create(caseId, { ...form, dateAdded: new Date().toISOString().slice(0, 10) });
-      setForm({ name: "", role: "", accessLevel: "Read Only" });
-      setShowForm(false);
+      const r = await fetch(`${API}/cases/${caseId}/contact-access`, {
+        method: "POST", headers: { "Content-Type": "application/json", Authorization: `Bearer ${token()}` },
+        body: JSON.stringify(form),
+      });
+      if (!r.ok) throw new Error();
       toast({ title: "Contact added" });
-      load();
-    } catch (err) {
-      toast({ title: "Failed to add", variant: "destructive" });
-    } finally { setSaving(false); }
+      setForm({ name: "", role: "", accessLevel: "Read Only", dateAdded: new Date().toISOString().slice(0,10) });
+      setOpen(false); load();
+    } catch { toast({ title: "Failed", variant: "destructive" }); }
+    finally { setSaving(false); }
   }
 
-  async function handleDelete(id: string) {
-    if (!confirm("Remove this contact?")) return;
-    await contactAccessApi.delete(caseId, id);
-    toast({ title: "Removed" });
+  async function remove(id: string) {
+    if (!confirm("Remove?")) return;
+    await fetch(`${API}/cases/${caseId}/contact-access/${id}`, { method: "DELETE", headers: { Authorization: `Bearer ${token()}` } });
     load();
   }
 
   return (
-    <div className="space-y-4 p-4">
-      <div className="flex justify-end">
-        <Button size="sm" onClick={() => setShowForm(!showForm)}>+ Add Contact</Button>
+    <div className="p-4">
+      <div className="flex justify-end mb-3">
+        <Dialog open={open} onOpenChange={setOpen}>
+          <DialogTrigger asChild><Button size="sm"><Plus className="h-4 w-4 mr-1" />Add Contact</Button></DialogTrigger>
+          <DialogContent>
+            <DialogHeader><DialogTitle>Add Contact Access</DialogTitle></DialogHeader>
+            <div className="space-y-3 pt-1">
+              <div><Label className="text-xs">Name</Label><Input value={form.name} onChange={e => setForm(f=>({...f,name:e.target.value}))} className="mt-1 h-9" /></div>
+              <div><Label className="text-xs">Role</Label><Input value={form.role} onChange={e => setForm(f=>({...f,role:e.target.value}))} className="mt-1 h-9" placeholder="e.g. Spouse, Lawyer" /></div>
+              <div>
+                <Label className="text-xs">Access Level</Label>
+                <Select value={form.accessLevel} onValueChange={v => setForm(f=>({...f,accessLevel:v}))}>
+                  <SelectTrigger className="mt-1 h-9"><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="Read Only">Read Only</SelectItem>
+                    <SelectItem value="Full Access">Full Access</SelectItem>
+                    <SelectItem value="Limited">Limited</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div><Label className="text-xs">Date Added</Label><Input type="date" value={form.dateAdded} onChange={e => setForm(f=>({...f,dateAdded:e.target.value}))} className="mt-1 h-9" /></div>
+              <div className="flex justify-end gap-2">
+                <Button variant="outline" onClick={() => setOpen(false)}>Cancel</Button>
+                <Button onClick={addContact} disabled={saving}>{saving ? "Saving..." : "Add"}</Button>
+              </div>
+            </div>
+          </DialogContent>
+        </Dialog>
       </div>
-
-      {showForm && (
-        <div className="bg-white border rounded-lg p-4 space-y-3">
-          <h3 className="font-medium text-sm">Add Contact Access</h3>
-          <div className="grid grid-cols-3 gap-3">
-            <div>
-              <Label>Name</Label>
-              <Input value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} placeholder="Full name" />
-            </div>
-            <div>
-              <Label>Role</Label>
-              <Input value={form.role} onChange={(e) => setForm({ ...form, role: e.target.value })} placeholder="e.g. Spouse" />
-            </div>
-            <div>
-              <Label>Access Level</Label>
-              <select
-                value={form.accessLevel}
-                onChange={(e) => setForm({ ...form, accessLevel: e.target.value })}
-                className="h-10 w-full rounded-md border border-input bg-background px-3 text-sm"
-              >
-                <option>Read Only</option>
-                <option>Full Access</option>
-                <option>Documents Only</option>
-              </select>
-            </div>
-          </div>
-          <div className="flex justify-end gap-2">
-            <Button variant="outline" size="sm" onClick={() => setShowForm(false)}>Cancel</Button>
-            <Button size="sm" onClick={handleAdd} disabled={saving}>{saving ? "Saving..." : "Add"}</Button>
-          </div>
-        </div>
-      )}
-
-      <div className="bg-white border rounded-lg overflow-hidden">
-        <table className="w-full text-sm">
-          <thead>
-            <tr className="border-b text-left text-muted-foreground">
-              <th className="px-4 py-2 font-medium">Name</th>
-              <th className="px-4 py-2 font-medium">Role</th>
-              <th className="px-4 py-2 font-medium">Access Level</th>
-              <th className="px-4 py-2 font-medium">Date Added</th>
-              <th className="px-4 py-2"></th>
-            </tr>
-          </thead>
-          <tbody>
-            {loading ? (
-              <tr><td colSpan={5} className="px-4 py-4 text-center text-muted-foreground">Loading...</td></tr>
-            ) : contacts.length === 0 ? (
-              <tr><td colSpan={5} className="px-4 py-4 text-center text-muted-foreground">No contacts added yet.</td></tr>
-            ) : (
-              contacts.map((c: any) => (
-                <tr key={c.id} className="border-b hover:bg-muted/30">
-                  <td className="px-4 py-2 font-medium">{c.name}</td>
-                  <td className="px-4 py-2 text-muted-foreground">{c.role || "—"}</td>
-                  <td className="px-4 py-2">
-                    <span className="px-2 py-0.5 rounded text-xs bg-blue-100 text-blue-700">{c.accessLevel}</span>
-                  </td>
-                  <td className="px-4 py-2 text-muted-foreground">{c.dateAdded}</td>
-                  <td className="px-4 py-2">
-                    <button onClick={() => handleDelete(c.id)} className="text-muted-foreground hover:text-red-500">
-                      <Trash2 className="w-4 h-4" />
-                    </button>
-                  </td>
-                </tr>
-              ))
-            )}
-          </tbody>
-        </table>
-      </div>
+      <Table>
+        <TableHeader>
+          <TableRow>
+            <TableHead className="text-xs">Name</TableHead>
+            <TableHead className="text-xs">Role</TableHead>
+            <TableHead className="text-xs">Access Level</TableHead>
+            <TableHead className="text-xs">Date Added</TableHead>
+            <TableHead className="text-xs w-10"></TableHead>
+          </TableRow>
+        </TableHeader>
+        <TableBody>
+          {contacts.length === 0 ? (
+            <TableRow><TableCell colSpan={5} className="text-center text-muted-foreground py-8 text-sm">No contacts added.</TableCell></TableRow>
+          ) : contacts.map((c: any) => (
+            <TableRow key={c.id}>
+              <TableCell className="py-2 font-medium">{c.name}</TableCell>
+              <TableCell className="py-2">{c.role}</TableCell>
+              <TableCell className="py-2">{c.accessLevel}</TableCell>
+              <TableCell className="py-2">{formatDate(c.dateAdded)}</TableCell>
+              <TableCell className="py-2">
+                <Button variant="ghost" size="icon" className="h-7 w-7 text-muted-foreground hover:text-destructive" onClick={() => remove(c.id)}>
+                  <Trash2 className="h-3.5 w-3.5" />
+                </Button>
+              </TableCell>
+            </TableRow>
+          ))}
+        </TableBody>
+      </Table>
     </div>
   );
 }
