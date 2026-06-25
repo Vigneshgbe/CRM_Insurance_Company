@@ -1,96 +1,113 @@
 import { Router } from 'express';
 import { authenticate } from '../middlewares/auth.middleware';
 
-// ── Controllers ──────────────────────────────────────────────────────────────
 import { login } from '../controllers/auth.controller';
-import { getDashboardStats, getRecentCases, getUpcomingLimitations, getRecentActivities } from '../controllers/dashboard.controller';
+
+import { getDashboardStats, getRecentCases, getUpcomingLimitations } from '../controllers/dashboard.controller';
+import { getRecentActivities } from '../controllers/activities.controller';
+
 import { getCases, createCase, getCaseById, updateCase } from '../controllers/cases.controller';
 import { getClients, createClient, getClientById, updateClient } from '../controllers/clients.controller';
-import { getNotes, createNote, deleteNote } from '../controllers/notes.controller';
-import { getActivities, createActivity } from '../controllers/activities.controller';
-import { getHistory } from '../controllers/history.controller';
-import { getStatusHistory, addStatus } from '../controllers/status.controller';
-import { getContactAccess, addContactAccess, deleteContactAccess } from '../controllers/contact-access.controller';
+
+// notes.controller uses getNotesByCaseId (not getNotes)
+import { getNotesByCaseId, createNote, deleteNote } from '../controllers/notes.controller';
+
+// activities.controller uses getActivitiesByCaseId (not getActivities)
+import { getActivitiesByCaseId, createActivity } from '../controllers/activities.controller';
+
+// history.controller uses getHistoryByCaseId and getStatusHistoryByCaseId
+import { getHistoryByCaseId, getStatusHistoryByCaseId } from '../controllers/history.controller';
+
+import { getContactAccess, createContactAccess, deleteContactAccess } from '../controllers/contact-access.controller';
+
 import { getDocumentsByCase, uploadDocument, getAllDocuments, deleteDocument, renameDocument, upload as docUpload } from '../controllers/documents.controller';
-import { getSettlement, saveSettlement } from '../controllers/settlement.controller';
-import { getThirdParty, saveThirdParty } from '../controllers/third-party.controller';
-import { getNoFault, saveNoFault } from '../controllers/no-fault.controller';
+
+import { getSettlement, upsertSettlement } from '../controllers/settlement.controller';
+import { getThirdParty, upsertThirdParty } from '../controllers/third-party.controller';
+import { getNoFault, upsertNoFault } from '../controllers/no-fault.controller';
+
 import { getMedical, saveMedical } from '../controllers/medical.controller';
 import { getEmployment, saveEmployment } from '../controllers/employment.controller';
+
+// police-info, lawyers, specialist — new controllers (save* naming)
 import { getPoliceInfo, savePoliceInfo } from '../controllers/police-info.controller';
 import { getLawyers, saveLawyers } from '../controllers/lawyers.controller';
 import { getSpecialist, saveSpecialist } from '../controllers/specialist.controller';
+
+// client-info and initial-interview — new controllers (save* naming)
 import { getClientInfo, saveClientInfo } from '../controllers/client-info.controller';
 import { getInitialInterview, saveInitialInterview } from '../controllers/initial-interview.controller';
-import { getOcfData, saveOcfData } from '../controllers/ocf.controller';
-import { getUsers, createUser, deleteUser } from '../controllers/users.controller';
-import { getReportStatusSummary, getReportMonthly, getReportLimitations, getReportSettlements } from '../controllers/reports.controller';
-import { getPortalCases, getPortalDocuments, uploadPortalDocument, getPortalStatusHistory } from '../controllers/portal.controller';
+
+// misc.controller has users, reports, portal, ocf
+import {
+  getUsers, createUser, deleteUser,
+  getStatusSummary, getMonthlyStats, getLimitationAlerts, getSettlementsSummary,
+  getPortalCases, getPortalDocuments, getPortalStatusHistory,
+  getOcfFormData, saveOcfFormData, getOcfPrefill
+} from '../controllers/misc.controller';
 
 const router = Router();
 
-// ── Public ───────────────────────────────────────────────────────────────────
+// Public
 router.post('/auth/login', login);
 
-// ── All routes below require JWT ─────────────────────────────────────────────
+// Protected
 router.use(authenticate);
 
-// ── Dashboard ────────────────────────────────────────────────────────────────
+// Dashboard
 router.get('/dashboard/stats',                getDashboardStats);
 router.get('/dashboard/recent-cases',         getRecentCases);
 router.get('/dashboard/upcoming-limitations', getUpcomingLimitations);
 router.get('/dashboard/recent-activities',    getRecentActivities);
 
-// ── Cases ─────────────────────────────────────────────────────────────────────
-router.get('/cases',      getCases);
-router.post('/cases',     createCase);
-router.get('/cases/:id',  getCaseById);
-router.put('/cases/:id',  updateCase);
+// Cases
+router.get('/cases',     getCases);
+router.post('/cases',    createCase);
+router.get('/cases/:id', getCaseById);
+router.put('/cases/:id', updateCase);
 
-// ── Clients ───────────────────────────────────────────────────────────────────
-router.get('/clients',      getClients);
-router.post('/clients',     createClient);
-router.get('/clients/:id',  getClientById);
-router.put('/clients/:id',  updateClient);
-
-// ── Case Tabs ─────────────────────────────────────────────────────────────────
+// Clients
+router.get('/clients',     getClients);
+router.post('/clients',    createClient);
+router.get('/clients/:id', getClientById);
+router.put('/clients/:id', updateClient);
 
 // Notes
-router.get('/cases/:caseId/notes',           getNotes);
-router.post('/cases/:caseId/notes',          createNote);
+router.get('/cases/:caseId/notes',            getNotesByCaseId);
+router.post('/cases/:caseId/notes',           createNote);
 router.delete('/cases/:caseId/notes/:noteId', deleteNote);
 
 // Activities
-router.get('/cases/:caseId/activities',  getActivities);
+router.get('/cases/:caseId/activities',  getActivitiesByCaseId);
 router.post('/cases/:caseId/activities', createActivity);
 
 // History
-router.get('/cases/:caseId/history', getHistory);
-
-// Status
-router.get('/cases/:caseId/status-history', getStatusHistory);
-router.post('/cases/:caseId/status',        addStatus);
+router.get('/cases/:caseId/history',        getHistoryByCaseId);
+router.get('/cases/:caseId/status-history', getStatusHistoryByCaseId);
 
 // Contact Access
-router.get('/cases/:caseId/contact-access',                   getContactAccess);
-router.post('/cases/:caseId/contact-access',                  addContactAccess);
-router.delete('/cases/:caseId/contact-access/:contactId',     deleteContactAccess);
+router.get('/cases/:caseId/contact-access',               getContactAccess);
+router.post('/cases/:caseId/contact-access',              createContactAccess);
+router.delete('/cases/:caseId/contact-access/:contactId', deleteContactAccess);
 
-// Documents (case-scoped)
+// Documents
 router.get('/cases/:caseId/documents',  getDocumentsByCase);
 router.post('/cases/:caseId/documents', docUpload.single('file'), uploadDocument);
+router.get('/documents',                getAllDocuments);
+router.put('/documents/:id',            renameDocument);
+router.delete('/documents/:id',         deleteDocument);
 
 // Settlement
 router.get('/cases/:caseId/settlement',  getSettlement);
-router.post('/cases/:caseId/settlement', saveSettlement);
+router.post('/cases/:caseId/settlement', upsertSettlement);
 
 // Third Party
 router.get('/cases/:caseId/third-party',  getThirdParty);
-router.post('/cases/:caseId/third-party', saveThirdParty);
+router.post('/cases/:caseId/third-party', upsertThirdParty);
 
 // No Fault
 router.get('/cases/:caseId/no-fault',  getNoFault);
-router.post('/cases/:caseId/no-fault', saveNoFault);
+router.post('/cases/:caseId/no-fault', upsertNoFault);
 
 // Medical
 router.get('/cases/:caseId/medical',  getMedical);
@@ -120,30 +137,25 @@ router.post('/cases/:caseId/client-info', saveClientInfo);
 router.get('/cases/:caseId/initial-interview',  getInitialInterview);
 router.post('/cases/:caseId/initial-interview', saveInitialInterview);
 
-// OCF Forms data (save/load per form number)
-router.get('/cases/:caseId/ocf/:formNumber',  getOcfData);
-router.post('/cases/:caseId/ocf/:formNumber', saveOcfData);
+// OCF Forms
+router.get('/cases/:caseId/ocf/prefill',      getOcfPrefill);
+router.get('/cases/:caseId/ocf/:formNumber',  getOcfFormData);
+router.post('/cases/:caseId/ocf/:formNumber', saveOcfFormData);
 
-// ── Documents (global) ────────────────────────────────────────────────────────
-router.get('/documents',       getAllDocuments);
-router.put('/documents/:id',   renameDocument);
-router.delete('/documents/:id', deleteDocument);
+// Users
+router.get('/users',        getUsers);
+router.post('/users',       createUser);
+router.delete('/users/:id', deleteUser);
 
-// ── Users ─────────────────────────────────────────────────────────────────────
-router.get('/users',         getUsers);
-router.post('/users',        createUser);
-router.delete('/users/:id',  deleteUser);
+// Reports
+router.get('/reports/status-summary', getStatusSummary);
+router.get('/reports/monthly',        getMonthlyStats);
+router.get('/reports/limitations',    getLimitationAlerts);
+router.get('/reports/settlements',    getSettlementsSummary);
 
-// ── Reports ───────────────────────────────────────────────────────────────────
-router.get('/reports/status-summary', getReportStatusSummary);
-router.get('/reports/monthly',        getReportMonthly);
-router.get('/reports/limitations',    getReportLimitations);
-router.get('/reports/settlements',    getReportSettlements);
-
-// ── Portal (client role) ──────────────────────────────────────────────────────
-router.get('/portal/cases',                      getPortalCases);
-router.get('/portal/documents',                  getPortalDocuments);
-router.post('/portal/documents',                 docUpload.single('file'), uploadPortalDocument);
-router.get('/portal/status-history/:caseId',     getPortalStatusHistory);
+// Portal
+router.get('/portal/cases',                  getPortalCases);
+router.get('/portal/documents',              getPortalDocuments);
+router.get('/portal/status-history/:caseId', getPortalStatusHistory);
 
 export default router;
