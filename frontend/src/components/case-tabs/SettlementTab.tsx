@@ -8,6 +8,10 @@ import { useState, useEffect } from "react";
 import { formatCurrency } from "@/lib/formatters";
 import { cn } from "@/lib/utils";
 import { API_BASE_URL } from "@/lib/constants";
+function getToken() {
+  return localStorage.getItem("crm_token") || localStorage.getItem("token") || "";
+}
+
 
 export default function SettlementTab({ caseId }: { caseId: string }) {
   const { toast } = useToast();
@@ -22,7 +26,7 @@ export default function SettlementTab({ caseId }: { caseId: string }) {
   });
 
   useEffect(() => {
-    const token = localStorage.getItem("token");
+    const token = getToken();
     fetch(`${API_BASE_URL}/cases/${caseId}/settlement`, {
       headers: { Authorization: `Bearer ${token}` },
     })
@@ -54,7 +58,7 @@ export default function SettlementTab({ caseId }: { caseId: string }) {
   const onSubmit = async (data: any) => {
     setLoading(true);
     try {
-      const token = localStorage.getItem("token");
+      const token = getToken();
       const payload = { ...data, payToClient, ourFinalAccount: finalAccount };
       const res = await fetch(`${API_BASE_URL}/cases/${caseId}/settlement`, {
         method: "POST",

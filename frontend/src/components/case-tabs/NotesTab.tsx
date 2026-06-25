@@ -18,6 +18,10 @@ interface Note {
   text: string;
 }
 
+function getToken() {
+  return localStorage.getItem("crm_token") || localStorage.getItem("token") || "";
+}
+
 export default function NotesTab({ caseId }: { caseId: string }) {
   const [notes, setNotes] = useState<Note[]>([]);
   const [newNote, setNewNote] = useState("");
@@ -25,15 +29,13 @@ export default function NotesTab({ caseId }: { caseId: string }) {
   const [fetching, setFetching] = useState(true);
   const { toast } = useToast();
 
-  const token = () => localStorage.getItem("token");
-
   useEffect(() => {
     fetch(`${API_BASE_URL}/cases/${caseId}/notes`, {
-      headers: { Authorization: `Bearer ${token()}` },
+      headers: { Authorization: `Bearer ${getToken()}` },
     })
       .then((r) => r.json())
-      .then(setNotes)
-      .catch(() => toast({ title: "Failed to load notes", variant: "destructive" }))
+      .then((data) => setNotes(Array.isArray(data) ? data : []))
+      .catch(() => setNotes([]))
       .finally(() => setFetching(false));
   }, [caseId]);
 
@@ -42,11 +44,11 @@ export default function NotesTab({ caseId }: { caseId: string }) {
     try {
       const res = await fetch(`${API_BASE_URL}/cases/${caseId}/notes`, {
         method: "POST",
-        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token()}` },
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${getToken()}` },
         body: JSON.stringify({ text: newNote }),
       });
       const note = await res.json();
-      setNotes([note, ...notes]);
+      setNotes((prev) => [note, ...prev]);
       setNewNote("");
       setOpen(false);
       toast({ title: "Note Added" });
@@ -59,9 +61,9 @@ export default function NotesTab({ caseId }: { caseId: string }) {
     try {
       await fetch(`${API_BASE_URL}/cases/${caseId}/notes/${id}`, {
         method: "DELETE",
-        headers: { Authorization: `Bearer ${token()}` },
+        headers: { Authorization: `Bearer ${getToken()}` },
       });
-      setNotes(notes.filter((n) => n.id !== id));
+      setNotes((prev) => prev.filter((n) => n.id !== id));
       toast({ title: "Note Deleted" });
     } catch {
       toast({ title: "Failed to delete note", variant: "destructive" });
@@ -73,7 +75,9 @@ export default function NotesTab({ caseId }: { caseId: string }) {
       <CardHeader className="pb-3 flex flex-row items-center justify-between">
         <CardTitle className="text-base">Notes</CardTitle>
         <Dialog open={open} onOpenChange={setOpen}>
-          <DialogTrigger asChild><Button size="sm"><Plus className="h-4 w-4 mr-1" /> Add Note</Button></DialogTrigger>
+          <DialogTrigger asChild>
+            <Button size="sm"><Plus className="h-4 w-4 mr-1" /> Add Note</Button>
+          </DialogTrigger>
           <DialogContent>
             <DialogHeader><DialogTitle>Add Note</DialogTitle></DialogHeader>
             <Textarea value={newNote} onChange={(e) => setNewNote(e.target.value)} placeholder="Enter note..." rows={4} />
@@ -83,13 +87,15 @@ export default function NotesTab({ caseId }: { caseId: string }) {
       </CardHeader>
       <CardContent className="p-0">
         <Table>
-          <TableHeader><TableRow>
-            <TableHead className="text-xs">Date</TableHead>
-            <TableHead className="text-xs">Time</TableHead>
-            <TableHead className="text-xs">Author</TableHead>
-            <TableHead className="text-xs">Note</TableHead>
-            <TableHead className="text-xs w-16"></TableHead>
-          </TableRow></TableHeader>
+          <TableHeader>
+            <TableRow>
+              <TableHead className="text-xs">Date</TableHead>
+              <TableHead className="text-xs">Time</TableHead>
+              <TableHead className="text-xs">Author</TableHead>
+              <TableHead className="text-xs">Note</TableHead>
+              <TableHead className="text-xs w-16"></TableHead>
+            </TableRow>
+          </TableHeader>
           <TableBody>
             {fetching && (
               <TableRow><TableCell colSpan={5} className="py-4 text-center text-sm text-muted-foreground">Loading...</TableCell></TableRow>

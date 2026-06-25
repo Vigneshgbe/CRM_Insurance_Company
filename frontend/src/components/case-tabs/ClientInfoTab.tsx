@@ -8,6 +8,10 @@ import { useToast } from "@/hooks/use-toast";
 import { formatCurrency, maskSIN } from "@/lib/formatters";
 import { Eye, EyeOff } from "lucide-react";
 import { API_BASE_URL } from "@/lib/constants";
+function getToken() {
+  return localStorage.getItem("crm_token") || localStorage.getItem("token") || "";
+}
+
 
 export default function ClientInfoTab({ caseId }: { caseId: string }) {
   const { toast } = useToast();
@@ -33,7 +37,7 @@ export default function ClientInfoTab({ caseId }: { caseId: string }) {
   });
 
   useEffect(() => {
-    const token = localStorage.getItem("token");
+    const token = getToken();
     fetch(`${API_BASE_URL}/cases/${caseId}/client-info`, {
       headers: { Authorization: `Bearer ${token}` },
     })
@@ -49,7 +53,7 @@ export default function ClientInfoTab({ caseId }: { caseId: string }) {
   const onSubmit = async (data: any) => {
     setLoading(true);
     try {
-      const token = localStorage.getItem("token");
+      const token = getToken();
       const res = await fetch(`${API_BASE_URL}/cases/${caseId}/client-info`, {
         method: "POST",
         headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },

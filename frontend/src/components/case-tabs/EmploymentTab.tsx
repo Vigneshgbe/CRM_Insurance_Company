@@ -7,6 +7,10 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { useToast } from "@/hooks/use-toast";
 import { useState, useEffect } from "react";
 import { JOB_DESCRIPTIONS, API_BASE_URL } from "@/lib/constants";
+function getToken() {
+  return localStorage.getItem("crm_token") || localStorage.getItem("token") || "";
+}
+
 
 function EmployerSection({ title, prefix, register, watch, setValue }: any) {
   const F = ({ label, name }: { label: string; name: string }) => (
@@ -73,7 +77,7 @@ export default function EmploymentTab({ caseId }: { caseId: string }) {
   });
 
   useEffect(() => {
-    const token = localStorage.getItem("token");
+    const token = getToken();
     fetch(`${API_BASE_URL}/cases/${caseId}/employment`, {
       headers: { Authorization: `Bearer ${token}` },
     })
@@ -86,7 +90,7 @@ export default function EmploymentTab({ caseId }: { caseId: string }) {
   const onSubmit = async (data: any) => {
     setLoading(true);
     try {
-      const token = localStorage.getItem("token");
+      const token = getToken();
       const res = await fetch(`${API_BASE_URL}/cases/${caseId}/employment`, {
         method: "POST",
         headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },

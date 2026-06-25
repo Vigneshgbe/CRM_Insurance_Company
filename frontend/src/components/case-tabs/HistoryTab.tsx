@@ -4,6 +4,10 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { formatDate } from "@/lib/formatters";
 import { useToast } from "@/hooks/use-toast";
 import { API_BASE_URL } from "@/lib/constants";
+function getToken() {
+  return localStorage.getItem("crm_token") || localStorage.getItem("token") || "";
+}
+
 
 interface HistoryEntry {
   id: string;
@@ -23,7 +27,7 @@ export default function HistoryTab({ caseId }: { caseId: string }) {
   const { toast } = useToast();
 
   useEffect(() => {
-    const token = localStorage.getItem("token");
+    const token = getToken();
     fetch(`${API_BASE_URL}/cases/${caseId}/history`, {
       headers: { Authorization: `Bearer ${token}` },
     })

@@ -7,6 +7,10 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { useToast } from "@/hooks/use-toast";
 import { useState, useEffect } from "react";
 import { PROVINCES, CAR_MAKES, API_BASE_URL } from "@/lib/constants";
+function getToken() {
+  return localStorage.getItem("crm_token") || localStorage.getItem("token") || "";
+}
+
 
 export default function NoFaultTab({ caseId }: { caseId: string }) {
   const { toast } = useToast();
@@ -25,7 +29,7 @@ export default function NoFaultTab({ caseId }: { caseId: string }) {
   });
 
   useEffect(() => {
-    const token = localStorage.getItem("token");
+    const token = getToken();
     fetch(`${API_BASE_URL}/cases/${caseId}/no-fault`, {
       headers: { Authorization: `Bearer ${token}` },
     })
@@ -38,7 +42,7 @@ export default function NoFaultTab({ caseId }: { caseId: string }) {
   const onSubmit = async (data: any) => {
     setLoading(true);
     try {
-      const token = localStorage.getItem("token");
+      const token = getToken();
       const res = await fetch(`${API_BASE_URL}/cases/${caseId}/no-fault`, {
         method: "POST",
         headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
