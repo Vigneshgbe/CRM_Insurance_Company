@@ -8,10 +8,10 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { useToast } from "@/hooks/use-toast";
 import { useState, useEffect } from "react";
 import { PHYSICAL_CONDITIONS, NEUROLOGICAL_CONDITIONS, PSYCHOLOGICAL_CONDITIONS, API_BASE_URL } from "@/lib/constants";
+
 function getToken() {
   return localStorage.getItem("crm_token") || localStorage.getItem("token") || "";
 }
-
 
 export default function MedicalTab({ caseId }: { caseId: string }) {
   const { toast } = useToast();
@@ -23,31 +23,38 @@ export default function MedicalTab({ caseId }: { caseId: string }) {
 
   const { register, handleSubmit, watch, setValue, reset } = useForm({
     defaultValues: {
+      // Family Doctor
       doctorName: "", doctorAddress: "", doctorCity: "", doctorProvPC: "",
       doctorPhone: "", doctorFax: "", doctorOutstanding: "",
+      // Hospital
       wentToHospital: "No", ambulanceRequired: "No",
       hospitalName: "", hospitalAddress: "", hospitalCity: "",
       hospitalProvince: "", hospitalPostal: "",
       dateAttended: "", dateReleased: "", xrayTaken: "No",
+      // Treating Clinic
       clinicName: "", clinicAddress: "", clinicCity: "", clinicProvPC: "",
       clinicPhone: "", clinicFax: "", clinicOutstanding: "",
+      // Treatment Providers
       tp1Centre: "", tp1Address: "", tp1Phone: "", tp1Fax: "", tp1Type: "",
       tp2Centre: "", tp2Address: "", tp2Phone: "", tp2Fax: "", tp2Type: "",
       tp3Centre: "", tp3Address: "", tp3Phone: "", tp3Fax: "", tp3Type: "",
       tp4Centre: "", tp4Address: "", tp4Phone: "", tp4Fax: "", tp4Type: "",
+      // Pre-Accident
       preCondition: "", preTimeFrame: "", preOperative: "", preStatus: "", postStatus: "",
+      // Medications
       med1: "", med2: "", med3: "", med4: "",
     },
   });
 
+  // ── Load real data from DB ─────────────────────────────────────────────────
   useEffect(() => {
-    const token = getToken();
     fetch(`${API_BASE_URL}/cases/${caseId}/medical`, {
-      headers: { Authorization: `Bearer ${token}` },
+      headers: { Authorization: `Bearer ${getToken()}` },
     })
-      .then((r) => r.json())
+      .then((r) => r.ok ? r.json() : {})
       .then((data) => {
-        // Split out checkbox arrays before reset
+        if (!data || Object.keys(data).length === 0) return;
+        // Extract checkbox arrays before reset (not part of useForm)
         const { physicalChecked: pc, neuroChecked: nc, psychChecked: sc, ...rest } = data;
         reset(rest);
         if (Array.isArray(pc)) setPhysicalChecked(pc);
@@ -62,13 +69,13 @@ export default function MedicalTab({ caseId }: { caseId: string }) {
     setList(list.includes(item) ? list.filter((i) => i !== item) : [...list, item]);
   };
 
+  // ── Save to DB ─────────────────────────────────────────────────────────────
   const onSubmit = async (data: any) => {
     setLoading(true);
     try {
-      const token = getToken();
       const res = await fetch(`${API_BASE_URL}/cases/${caseId}/medical`, {
         method: "POST",
-        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${getToken()}` },
         body: JSON.stringify({ ...data, physicalChecked, neuroChecked, psychChecked }),
       });
       if (!res.ok) throw new Error();
@@ -81,15 +88,23 @@ export default function MedicalTab({ caseId }: { caseId: string }) {
   };
 
   const F = ({ label, name, type = "text" }: { label: string; name: string; type?: string }) => (
-    <div><Label className="text-xs">{label}</Label><Input {...register(name as any)} type={type} className="h-8 text-xs mt-1" /></div>
+    <div>
+      <Label className="text-xs">{label}</Label>
+      <Input {...register(name as any)} type={type} className="h-8 text-xs mt-1" />
+    </div>
   );
 
   const YN = ({ label, name, highlight = false }: { label: string; name: string; highlight?: boolean }) => (
     <div>
       <Label className="text-xs">{label}</Label>
       <Select value={watch(name as any)} onValueChange={(v) => setValue(name as any, v)}>
-        <SelectTrigger className={`h-8 text-xs mt-1 ${highlight && watch(name as any) === "Yes" ? "border-warning bg-warning/10" : ""}`}><SelectValue /></SelectTrigger>
-        <SelectContent><SelectItem value="Yes">Yes</SelectItem><SelectItem value="No">No</SelectItem></SelectContent>
+        <SelectTrigger className={`h-8 text-xs mt-1 ${highlight && watch(name as any) === "Yes" ? "border-warning bg-warning/10" : ""}`}>
+          <SelectValue />
+        </SelectTrigger>
+        <SelectContent>
+          <SelectItem value="Yes">Yes</SelectItem>
+          <SelectItem value="No">No</SelectItem>
+        </SelectContent>
       </Select>
     </div>
   );
@@ -157,7 +172,12 @@ export default function MedicalTab({ caseId }: { caseId: string }) {
                   <div className="flex gap-3">
                     {["Physio", "Chiro", "Rehab", "Psych"].map((t) => (
                       <label key={t} className="flex items-center gap-1 text-xs">
-                        <input type="checkbox" checked={watch(`tp${i}Type` as any) === t} onChange={(e) => setValue(`tp${i}Type` as any, e.target.checked ? t : "")} className="h-3 w-3" />
+                        <input
+                          type="checkbox"
+                          checked={watch(`tp${i}Type` as any) === t}
+                          onChange={(e) => setValue(`tp${i}Type` as any, e.target.checked ? t : "")}
+                          className="h-3 w-3"
+                        />
                         {t}
                       </label>
                     ))}
@@ -177,7 +197,11 @@ export default function MedicalTab({ caseId }: { caseId: string }) {
                 <div className="flex flex-wrap gap-2 mt-1">
                   {PHYSICAL_CONDITIONS.map((c) => (
                     <label key={c} className="flex items-center gap-1 text-xs">
-                      <Checkbox checked={physicalChecked.includes(c)} onCheckedChange={() => toggleCheck(physicalChecked, setPhysicalChecked, c)} className="h-3.5 w-3.5" />
+                      <Checkbox
+                        checked={physicalChecked.includes(c)}
+                        onCheckedChange={() => toggleCheck(physicalChecked, setPhysicalChecked, c)}
+                        className="h-3.5 w-3.5"
+                      />
                       {c}
                     </label>
                   ))}
@@ -188,7 +212,11 @@ export default function MedicalTab({ caseId }: { caseId: string }) {
                 <div className="flex flex-wrap gap-2 mt-1">
                   {NEUROLOGICAL_CONDITIONS.map((c) => (
                     <label key={c} className="flex items-center gap-1 text-xs">
-                      <Checkbox checked={neuroChecked.includes(c)} onCheckedChange={() => toggleCheck(neuroChecked, setNeuroChecked, c)} className="h-3.5 w-3.5" />
+                      <Checkbox
+                        checked={neuroChecked.includes(c)}
+                        onCheckedChange={() => toggleCheck(neuroChecked, setNeuroChecked, c)}
+                        className="h-3.5 w-3.5"
+                      />
                       {c}
                     </label>
                   ))}
@@ -199,7 +227,11 @@ export default function MedicalTab({ caseId }: { caseId: string }) {
                 <div className="flex flex-wrap gap-3 mt-1">
                   {PSYCHOLOGICAL_CONDITIONS.map((c) => (
                     <label key={c} className="flex items-center gap-1 text-xs">
-                      <Checkbox checked={psychChecked.includes(c)} onCheckedChange={() => toggleCheck(psychChecked, setPsychChecked, c)} className="h-3.5 w-3.5" />
+                      <Checkbox
+                        checked={psychChecked.includes(c)}
+                        onCheckedChange={() => toggleCheck(psychChecked, setPsychChecked, c)}
+                        className="h-3.5 w-3.5"
+                      />
                       {c}
                     </label>
                   ))}
