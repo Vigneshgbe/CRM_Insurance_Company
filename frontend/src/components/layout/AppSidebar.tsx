@@ -1,17 +1,21 @@
 import { Link, useLocation, useNavigate } from "react-router-dom";
-import { LayoutDashboard, Users, FolderOpen, FileText, FileTextIcon, BarChart3, Settings, LogOut } from "lucide-react";
+import {
+  LayoutDashboard, Users, FolderOpen, FileText, FileTextIcon,
+  BarChart3, Settings, LogOut, FileEdit,
+} from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/lib/auth";
 
 // Templates kept — /templates and /templates/editor routes exist in App.tsx
 const navItems = [
-  { label: "Dashboard", icon: LayoutDashboard, path: "/dashboard" },
-  { label: "Clients",   icon: Users,           path: "/clients"   },
-  { label: "Cases",     icon: FolderOpen,       path: "/cases"     },
-  { label: "Documents", icon: FileText,         path: "/documents" },
-  { label: "Templates", icon: FileTextIcon,     path: "/templates" },
-  { label: "Reports",   icon: BarChart3,        path: "/reports"   },
-  { label: "Settings",  icon: Settings,         path: "/settings"  },
+  { label: "Dashboard", icon: LayoutDashboard, path: "/dashboard"       },
+  { label: "Clients",   icon: Users,           path: "/clients"         },
+  { label: "Cases",     icon: FolderOpen,       path: "/cases"           },
+  { label: "Documents", icon: FileText,         path: "/documents"       },
+  { label: "Editor",    icon: FileEdit,         path: "/document-editor" },
+  { label: "Templates", icon: FileTextIcon,     path: "/templates"       },
+  { label: "Reports",   icon: BarChart3,        path: "/reports"         },
+  { label: "Settings",  icon: Settings,         path: "/settings"        },
 ];
 
 function getRoleLabel(user: any): string {
@@ -47,9 +51,13 @@ export function AppSidebar() {
       {/* Navigation */}
       <nav className="flex-1 py-3 px-3 space-y-0.5">
         {navItems.map((item) => {
-          const active = location.pathname.startsWith(
-            item.path.split("/").slice(0, 2).join("/")
-          );
+          // /document-editor must only match itself — not /documents
+          const active = item.path === "/document-editor"
+            ? location.pathname.startsWith("/document-editor")
+            : location.pathname.startsWith(
+                item.path.split("/").slice(0, 2).join("/")
+              );
+
           return (
             <Link
               key={item.path}
