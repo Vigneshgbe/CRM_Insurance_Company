@@ -1,25 +1,23 @@
 import { Link, useLocation, useNavigate } from "react-router-dom";
-import { LayoutDashboard, Users, FolderOpen, FileText, BarChart3, Settings, LogOut } from "lucide-react";
+import { LayoutDashboard, Users, FolderOpen, FileText, FileTextIcon, BarChart3, Settings, LogOut } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/lib/auth";
 
-// Templates removed — matches Settings page cleanup
+// Templates kept — /templates and /templates/editor routes exist in App.tsx
 const navItems = [
   { label: "Dashboard", icon: LayoutDashboard, path: "/dashboard" },
   { label: "Clients",   icon: Users,           path: "/clients"   },
   { label: "Cases",     icon: FolderOpen,       path: "/cases"     },
   { label: "Documents", icon: FileText,         path: "/documents" },
+  { label: "Templates", icon: FileTextIcon,     path: "/templates" },
   { label: "Reports",   icon: BarChart3,        path: "/reports"   },
   { label: "Settings",  icon: Settings,         path: "/settings"  },
 ];
 
-// Map DB role → display label
 function getRoleLabel(user: any): string {
   if (!user) return "";
-  // display_role comes from the users table (Admin / Manager / Staff / Client)
   if (user.displayRole)  return user.displayRole;
   if (user.display_role) return user.display_role;
-  // Fall back to role field
   if (user.role === "client")   return "Client";
   if (user.role === "employee") return "Staff";
   return user.role || "";
