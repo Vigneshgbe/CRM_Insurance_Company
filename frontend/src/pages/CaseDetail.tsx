@@ -252,47 +252,71 @@ export default function CaseDetail() {
       <Card className="mb-4">
         <CardContent className="p-4">
           {!editing ? (
-            <div className="flex items-start justify-between">
-              <div>
+            <div className="flex items-start justify-between gap-4">
+              <div className="min-w-0 flex-1">
+                {/* Client Name */}
                 <h2 className="text-xl font-bold">
-                  {caseData.client?.firstName} {caseData.client?.lastName}
+                  {caseData.client?.firstName || caseData.firstName || ""}{" "}
+                  {caseData.client?.lastName  || caseData.lastName  || ""}
                 </h2>
-                <div className="flex flex-wrap items-center gap-2 mt-2 text-sm text-muted-foreground">
-                  <span className="font-medium text-foreground">{caseData.fileNo}</span>
+
+                {/* Row 1: File No, Status, DOL, Limitation */}
+                <div className="flex flex-wrap items-center gap-x-3 gap-y-1 mt-2 text-sm">
+                  <span className="font-semibold text-foreground">{caseData.fileNo}</span>
                   <Badge className={cn("text-xs", statusColor[caseData.fileStatus] || "bg-secondary")}>
                     {caseData.fileStatus}
                   </Badge>
-                  <span>DOL: {formatDate(caseData.dateOfLoss)}</span>
+                  <span className="text-muted-foreground">
+                    DOL: <span className="text-foreground">{formatDate(caseData.dateOfLoss) || "—"}</span>
+                  </span>
                   <span className={cn(
-                    limDays !== null && limDays <= 7 && limDays >= 0 ? "text-destructive font-semibold" :
-                    limDays !== null && limDays <= 30 && limDays > 7 ? "text-orange-500" : ""
+                    "text-muted-foreground",
+                    limDays !== null && limDays <= 7  && limDays >= 0 ? "!text-destructive font-semibold" :
+                    limDays !== null && limDays <= 30 && limDays > 7  ? "!text-orange-500" : ""
                   )}>
-                    Limitation: {formatDate(caseData.limitationDate)}
+                    Limitation: <span className="font-medium">{formatDate(caseData.limitationDate) || "—"}</span>
                   </span>
                 </div>
-                <div className="flex flex-wrap gap-4 mt-1 text-xs text-muted-foreground">
-                  <span>Clerk: {caseData.clerkAssigned || "—"}</span>
-                  <span>Secretary: {caseData.secretary || "—"}</span>
-                  <span>Referred: {caseData.referredBy || "—"}</span>
-                  {caseData.clientInitials && <span>Initials: {caseData.clientInitials}</span>}
+
+                {/* Row 2: Clerk, Secretary, Referred, Initials */}
+                <div className="flex flex-wrap gap-x-4 gap-y-1 mt-1 text-xs text-muted-foreground">
+                  <span>Clerk: <span className="text-foreground">{caseData.clerkAssigned || "—"}</span></span>
+                  <span>Secretary: <span className="text-foreground">{caseData.secretary || "—"}</span></span>
+                  <span>Referred: <span className="text-foreground">{caseData.referredBy || "—"}</span></span>
+                  {caseData.clientInitials && (
+                    <span>Initials: <span className="text-foreground font-medium">{caseData.clientInitials}</span></span>
+                  )}
                 </div>
-                {caseData.clientStreet && (
-                  <p className="text-xs text-muted-foreground mt-1">
-                    Address: {caseData.clientStreet}, {caseData.clientCity},{" "}
-                    {caseData.clientState} {caseData.clientZip}, {caseData.clientCountry}
-                  </p>
-                )}
-                {caseData.clientMobile && (
-                  <p className="text-xs text-muted-foreground mt-1 flex items-center gap-1">
-                    <Phone className="h-3 w-3" />
-                    <span>Mobile:</span>
-                    <a href={getMobileTelUri(caseData.clientMobile)} className="hover:underline text-foreground">
+
+                {/* Row 3: Address — always shown, dash if empty */}
+                <div className="mt-1 text-xs text-muted-foreground flex items-start gap-1">
+                  <span className="shrink-0">Address:</span>
+                  <span className="text-foreground">
+                    {caseData.clientStreet
+                      ? [caseData.clientStreet, caseData.clientCity, caseData.clientState, caseData.clientZip, caseData.clientCountry]
+                          .filter(Boolean).join(", ")
+                      : "—"}
+                  </span>
+                </div>
+
+                {/* Row 4: Mobile — always shown, dash if empty */}
+                <div className="mt-1 text-xs text-muted-foreground flex items-center gap-1">
+                  <Phone className="h-3 w-3 shrink-0" />
+                  <span>Mobile:</span>
+                  {caseData.clientMobile ? (
+                    <a
+                      href={getMobileTelUri(caseData.clientMobile)}
+                      className="hover:underline text-foreground font-medium"
+                    >
                       {formatMobileNumber(caseData.clientMobile)}
                     </a>
-                  </p>
-                )}
+                  ) : (
+                    <span className="text-foreground">—</span>
+                  )}
+                </div>
               </div>
-              <Button variant="outline" size="sm" onClick={() => setEditing(true)}>
+
+              <Button variant="outline" size="sm" onClick={() => setEditing(true)} className="shrink-0">
                 <Pencil className="h-3.5 w-3.5 mr-1" /> Edit
               </Button>
             </div>
