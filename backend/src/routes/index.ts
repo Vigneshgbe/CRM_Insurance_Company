@@ -22,7 +22,7 @@ import { getSpecialist, saveSpecialist } from '../controllers/specialist.control
 import { getClientInfo, saveClientInfo } from '../controllers/client-info.controller';
 import { getInitialInterview, saveInitialInterview } from '../controllers/initial-interview.controller';
 import {
-  getUsers, createUser, deleteUser,
+  getUsers, createUser, deleteUser, reactivateUser, hardDeleteUser,
   getStatusSummary, getMonthlyStats, getLimitationAlerts, getSettlementsSummary,
   getPortalCases, getPortalDocuments, getPortalStatusHistory,
 } from '../controllers/misc.controller';
@@ -132,9 +132,11 @@ router.get('/cases/:caseId/ocf/:formNumber',  getOcfFormData);
 router.post('/cases/:caseId/ocf/:formNumber', saveOcfFormData);
 
 // Users
-router.get('/users',        getUsers);
-router.post('/users',       createUser);
-router.delete('/users/:id', deleteUser);
+router.get   ('/users',                  getUsers);
+router.post  ('/users',                  createUser);
+router.delete('/users/:id',              deleteUser);
+router.put   ('/users/:id/reactivate',   reactivateUser);
+router.delete('/users/:id/permanent',    hardDeleteUser);
 
 // Reports
 router.get('/reports/status-summary', getStatusSummary);

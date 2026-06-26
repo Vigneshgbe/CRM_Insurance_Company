@@ -209,3 +209,75 @@ export async function getOcfPrefill(req: Request, res: Response): Promise<void> 
     });
   } catch (err) { console.error(err); res.status(500).json({ error: 'Server error' }); }
 }
+
+// ─────────────────────────────────────────────────────────────────────────────
+// ADD THESE TWO FUNCTIONS to the bottom of:
+//   D:\CRM_Phase_1\backend\src\controllers\misc.controller.ts
+//
+// They sit right after the existing `deleteUser` function — do NOT remove
+// or alter deleteUser or anything above it.
+// ─────────────────────────────────────────────────────────────────────────────
+
+// ── PUT /api/users/:id/reactivate  (Admin only — enforced in route + here) ──
+export async function reactivateUser(req: Request, res: Response): Promise<void> {
+  try {
+    const { id } = req.params;
+    const requester = (req as any).user;
+
+    // Only Admin display_role can reactivate
+    if (requester?.display_role !== 'Admin') {
+      res.status(403).json({ error: 'Only Admin users can reactivate accounts' });
+      return;
+    }
+
+    // Cannot reactivate yourself (edge case guard)
+    if (requester?.id === id) {
+      res.status(400).json({ error: 'Cannot change your own active status' });
+      return;
+    }
+
+    const [result]: any = await pool.query(
+      'UPDATE users SET is_active = 1 WHERE id = ?',
+      [id]
+    );
+    if (result.affectedRows === 0) {
+      res.status(404).json({ error: 'User not found' });
+      return;
+    }
+    res.json({ success: true, message: 'User reactivated' });
+  } catch (err: any) {
+    res.status(500).json({ error: 'Server error' });
+  }
+}
+
+// ── DELETE /api/users/:id/permanent  (Admin only — hard delete) ───────────────
+export async function hardDeleteUser(req: Request, res: Response): Promise<void> {
+  try {
+    const { id } = req.params;
+    const requester = (req as any).user;
+
+    // Only Admin display_role can hard-delete
+    if (requester?.display_role !== 'Admin') {
+      res.status(403).json({ error: 'Only Admin users can permanently delete accounts' });
+      return;
+    }
+
+    // Cannot delete yourself
+    if (requester?.id === id) {
+      res.status(400).json({ error: 'Cannot delete your own account' });
+      return;
+    }
+
+    const [result]: any = await pool.query(
+      'DELETE FROM users WHERE id = ?',
+      [id]
+    );
+    if (result.affectedRows === 0) {
+      res.status(404).json({ error: 'User not found' });
+      return;
+    }
+    res.json({ success: true, message: 'User permanently deleted' });
+  } catch (err: any) {
+    res.status(500).json({ error: 'Server error' });
+  }
+}

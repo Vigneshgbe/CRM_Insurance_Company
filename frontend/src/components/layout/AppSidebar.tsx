@@ -37,7 +37,7 @@ function readAppName(): string {
       if (parsed.appName) return parsed.appName;
     }
   } catch { /* ignore */ }
-  return "Hypernova CRM";
+  return "Padak Pvt Ltd CRM";
 }
 
 export function AppSidebar() {
