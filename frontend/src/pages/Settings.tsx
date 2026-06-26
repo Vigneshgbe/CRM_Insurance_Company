@@ -35,8 +35,19 @@ export default function Settings() {
   const [activeTab, setActiveTab] = useState("Users");
 
   // Is the logged-in user an Admin?
-  const isAdmin = currentUser?.display_role === "Admin" ||
-                  (currentUser as any)?.displayRole === "Admin";
+  // display_role is in the JWT only after the auth controller fix + re-login.
+  // rawStored is a fallback that reads the saved crm_user JSON directly, which
+  // may already have display_role if the backend was fixed before this session.
+  const rawStored = (() => {
+    try { return JSON.parse(localStorage.getItem("crm_user") || "{}"); } catch { return {}; }
+  })();
+  const effectiveRole: string =
+    (currentUser as any)?.display_role ||
+    (currentUser as any)?.displayRole  ||
+    rawStored?.display_role            ||
+    rawStored?.displayRole             ||
+    "";
+  const isAdmin = effectiveRole === "Admin";
 
   // ── Users state ─────────────────────────────────────────────────────────────
   const [users, setUsers] = useState<any[]>([]);

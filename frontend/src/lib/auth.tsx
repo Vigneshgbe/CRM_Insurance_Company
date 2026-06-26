@@ -2,18 +2,19 @@ import { createContext, useContext, useState, useEffect, useRef, ReactNode } fro
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 export interface AuthUser {
-  id: string;
-  email: string;
-  name: string;
-  role: "employee" | "client";
-  clientId?: string;
+  id:            string;
+  email:         string;
+  name:          string;
+  role:          "employee" | "client";
+  display_role?: string;   // Admin | Manager | Staff | Client
+  clientId?:     string;
 }
 
 interface AuthContextType {
-  user: AuthUser | null;
+  user:    AuthUser | null;
   loading: boolean;           // true only during initial restore
-  login: (email: string, password: string) => Promise<boolean>;
-  logout: () => void;
+  login:   (email: string, password: string) => Promise<boolean>;
+  logout:  () => void;
 }
 
 const API_URL = "http://localhost:5000/api";
@@ -109,9 +110,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   async function login(email: string, password: string): Promise<boolean> {
     try {
       const response = await fetch(`${API_URL}/auth/login`, {
-        method: "POST",
+        method:  "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email, password }),
+        body:    JSON.stringify({ email, password }),
       });
 
       if (!response.ok) return false;
@@ -119,6 +120,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       const data = await response.json();
       if (!data.token || !data.user) return false;
 
+      // data.user now includes display_role from the backend
       saveAuth(data.token, data.user);
       setUser(data.user);
       return true;

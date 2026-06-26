@@ -18,11 +18,12 @@ export async function login(req: Request, res: Response): Promise<void> {
     if (!valid) { res.status(401).json({ error: 'Invalid credentials' }); return; }
 
     const payload = {
-      id: user.id,
-      name: user.name,
-      email: user.email,
-      role: user.role,
-      clientId: user.client_id || undefined,
+      id:           user.id,
+      name:         user.name,
+      email:        user.email,
+      role:         user.role,
+      display_role: user.display_role || 'Staff',
+      clientId:     user.client_id || undefined,
     };
     const token = jwt.sign(payload, process.env.JWT_SECRET || 'hypernova_secret', {
       expiresIn: (process.env.JWT_EXPIRES_IN || '8h') as any,
