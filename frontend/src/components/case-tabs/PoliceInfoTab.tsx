@@ -8,15 +8,16 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { useToast } from "@/hooks/use-toast";
 import { useState, useEffect } from "react";
 import { API_BASE_URL } from "@/lib/constants";
+
 function getToken() {
   return localStorage.getItem("crm_token") || localStorage.getItem("token") || "";
 }
-
 
 export default function PoliceInfoTab({ caseId }: { caseId: string }) {
   const { toast } = useToast();
   const [loading, setLoading] = useState(false);
   const [fetching, setFetching] = useState(true);
+
   const { register, handleSubmit, watch, setValue, reset } = useForm({
     defaultValues: {
       reportedDate: "No", reportOrdered: "No", reportOrderedDate: "",
@@ -29,24 +30,26 @@ export default function PoliceInfoTab({ caseId }: { caseId: string }) {
     },
   });
 
+  // ── Load real data from DB ─────────────────────────────────────────────────
   useEffect(() => {
-    const token = getToken();
     fetch(`${API_BASE_URL}/cases/${caseId}/police-info`, {
-      headers: { Authorization: `Bearer ${token}` },
+      headers: { Authorization: `Bearer ${getToken()}` },
     })
-      .then((r) => r.json())
-      .then((data) => { reset(data); })
+      .then((r) => r.ok ? r.json() : {})
+      .then((data) => {
+        if (data && Object.keys(data).length > 0) reset(data);
+      })
       .catch(() => toast({ title: "Failed to load police info", variant: "destructive" }))
       .finally(() => setFetching(false));
   }, [caseId]);
 
+  // ── Save to DB ─────────────────────────────────────────────────────────────
   const onSubmit = async (data: any) => {
     setLoading(true);
     try {
-      const token = getToken();
       const res = await fetch(`${API_BASE_URL}/cases/${caseId}/police-info`, {
         method: "POST",
-        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${getToken()}` },
         body: JSON.stringify(data),
       });
       if (!res.ok) throw new Error();
@@ -59,7 +62,10 @@ export default function PoliceInfoTab({ caseId }: { caseId: string }) {
   };
 
   const F = ({ label, name, type = "text" }: { label: string; name: string; type?: string }) => (
-    <div><Label className="text-xs">{label}</Label><Input {...register(name as any)} type={type} className="h-8 text-xs mt-1" /></div>
+    <div>
+      <Label className="text-xs">{label}</Label>
+      <Input {...register(name as any)} type={type} className="h-8 text-xs mt-1" />
+    </div>
   );
 
   if (fetching) return <div className="p-6 text-sm text-muted-foreground">Loading...</div>;
@@ -70,16 +76,24 @@ export default function PoliceInfoTab({ caseId }: { caseId: string }) {
         <CardHeader className="pb-2"><CardTitle className="text-sm">Police Information</CardTitle></CardHeader>
         <CardContent>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-            <div><Label className="text-xs">Reported Date?</Label>
-              <Select value={watch("reportedDate" as any)} onValueChange={(v) => setValue("reportedDate" as any, v)}>
+            <div>
+              <Label className="text-xs">Reported Date?</Label>
+              <Select value={watch("reportedDate")} onValueChange={(v) => setValue("reportedDate", v)}>
                 <SelectTrigger className="h-8 text-xs mt-1"><SelectValue /></SelectTrigger>
-                <SelectContent><SelectItem value="Yes">Yes</SelectItem><SelectItem value="No">No</SelectItem></SelectContent>
+                <SelectContent>
+                  <SelectItem value="Yes">Yes</SelectItem>
+                  <SelectItem value="No">No</SelectItem>
+                </SelectContent>
               </Select>
             </div>
-            <div><Label className="text-xs">Report Ordered?</Label>
-              <Select value={watch("reportOrdered" as any)} onValueChange={(v) => setValue("reportOrdered" as any, v)}>
+            <div>
+              <Label className="text-xs">Report Ordered?</Label>
+              <Select value={watch("reportOrdered")} onValueChange={(v) => setValue("reportOrdered", v)}>
                 <SelectTrigger className="h-8 text-xs mt-1"><SelectValue /></SelectTrigger>
-                <SelectContent><SelectItem value="Yes">Yes</SelectItem><SelectItem value="No">No</SelectItem></SelectContent>
+                <SelectContent>
+                  <SelectItem value="Yes">Yes</SelectItem>
+                  <SelectItem value="No">No</SelectItem>
+                </SelectContent>
               </Select>
             </div>
             <F label="Report Ordered Date" name="reportOrderedDate" type="date" />
@@ -104,7 +118,9 @@ export default function PoliceInfoTab({ caseId }: { caseId: string }) {
         </CardContent>
       </Card>
       <div className="flex justify-end mt-4">
-        <Button type="submit" disabled={loading}>{loading ? "Saving..." : "Save Police Info"}</Button>
+        <Button type="submit" disabled={loading}>
+          {loading ? "Saving..." : "Save Police Info"}
+        </Button>
       </div>
     </form>
   );
