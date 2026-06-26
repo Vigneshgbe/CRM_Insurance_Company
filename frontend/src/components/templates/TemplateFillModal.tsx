@@ -1000,7 +1000,7 @@ async function exportToPDF(fields: Record<string,any>, templateName: string) {
   for (let i = 1; i <= totalPages; i++) {
     doc.setPage(i);
     doc.setFontSize(7); doc.setFont("helvetica","normal");
-    doc.text(`© King's Printer for Ontario — ${templateName} — Page ${i} of ${totalPages}`, pageW/2, pageH-10, {align:"center"});
+    doc.text(`© Padak (Pvt) Ltd. Printer for Ontario — ${templateName} — Page ${i} of ${totalPages}`, pageW/2, pageH-10, {align:"center"});
     doc.text(`Generated: ${new Date().toLocaleDateString("en-CA")}`, pageW-margin, pageH-10, {align:"right"});
   }
 
