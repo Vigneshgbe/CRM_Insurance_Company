@@ -1,100 +1,106 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
+import { useNavigate } from "react-router-dom";
 import { AppLayout } from "@/components/layout/AppLayout";
 import { Card, CardContent } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { formatDate, daysUntil } from "@/lib/formatters";
-import { Link } from "react-router-dom";
+import { FILE_STATUSES, API_BASE_URL } from "@/lib/constants";
 import { cn } from "@/lib/utils";
-import { Eye } from "lucide-react";
-import { casesApi } from "@/lib/api";
+import { Plus, Eye } from "lucide-react";
+import { useToast } from "@/hooks/use-toast";
 
-const FILE_STATUSES = ["Active", "Closed", "Pending", "On Hold", "Settled", "Litigation", "Mediation", "Arbitration"];
-const CASE_TYPES = ["Motor Vehicle Accident (MVA)", "Slip and Fall", "Traffic Accident", "Immigration"];
-
-const statusColor: Record<string, string> = {
-  Active: "bg-success text-success-foreground",
-  Closed: "bg-muted text-muted-foreground",
-  Pending: "bg-warning text-warning-foreground",
-  "On Hold": "bg-muted text-muted-foreground",
-  Settled: "bg-primary text-primary-foreground",
-  Litigation: "bg-destructive text-destructive-foreground",
-  Mediation: "bg-warning text-warning-foreground",
-  Arbitration: "bg-destructive text-destructive-foreground",
-};
-
-function LimitationBadge({ date }: { date: string }) {
-  if (!date) return <span>—</span>;
-  const days = daysUntil(date);
-  if (days < 0) return <Badge variant="secondary" className="text-xs">Past</Badge>;
-  if (days <= 30) return <Badge variant="destructive" className="text-xs">URGENT</Badge>;
-  if (days <= 60) return <Badge variant="outline" className="text-xs text-warning border-warning">{days}d</Badge>;
-  return <Badge variant="outline" className="text-xs text-success border-success">{days}d</Badge>;
+function getToken() {
+  return localStorage.getItem("crm_token") || localStorage.getItem("token") || "";
 }
 
-const PAGE_SIZE = 10;
+const STAFF = ["All", "Amanda Singh", "John Baker"];
 
 export default function Cases() {
+  const navigate = useNavigate();
+  const { toast } = useToast();
   const [cases, setCases] = useState<any[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [fetching, setFetching] = useState(true);
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
-  const [typeFilter, setTypeFilter] = useState("all");
-  const [page, setPage] = useState(1);
+  const [assignedFilter, setAssignedFilter] = useState("All");
+  const [dateFrom, setDateFrom] = useState("");
+  const [dateTo, setDateTo] = useState("");
 
+  // ── Load all cases from real API ─────────────────────────────────────────
   useEffect(() => {
-    const timer = setTimeout(async () => {
-      setLoading(true);
-      try {
-        const data = await casesApi.getAll({
-          search: search || undefined,
-          status: statusFilter !== "all" ? statusFilter : undefined,
-          caseType: typeFilter !== "all" ? typeFilter : undefined,
-        });
-        setCases(data);
-        setPage(1);
-      } catch (err) {
-        console.error(err);
-      } finally {
-        setLoading(false);
-      }
-    }, 300);
-    return () => clearTimeout(timer);
-  }, [search, statusFilter, typeFilter]);
+    fetch(`${API_BASE_URL}/cases`, {
+      headers: { Authorization: `Bearer ${getToken()}` },
+    })
+      .then((r) => r.ok ? r.json() : [])
+      .then((data) => setCases(Array.isArray(data) ? data : []))
+      .catch(() => toast({ title: "Failed to load cases", variant: "destructive" }))
+      .finally(() => setFetching(false));
+  }, []);
 
-  const totalPages = Math.ceil(cases.length / PAGE_SIZE);
-  const paginated = cases.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
+  // ── Client-side filter (fast, no round-trip needed) ──────────────────────
+  const filtered = useMemo(() => {
+    return cases.filter((c) => {
+      const q = search.toLowerCase();
+      const clientName = `${c.client?.firstName || ""} ${c.client?.lastName || ""}`.toLowerCase();
+      const matchSearch = !q || (c.fileNo || "").toLowerCase().includes(q) || clientName.includes(q);
+      const matchStatus = statusFilter === "all" || c.fileStatus === statusFilter;
+      const matchAssigned = assignedFilter === "All" || c.clerkAssigned === assignedFilter;
+      const matchDateFrom = !dateFrom || (c.dateOfLoss || "") >= dateFrom;
+      const matchDateTo = !dateTo || (c.dateOfLoss || "") <= dateTo;
+      return matchSearch && matchStatus && matchAssigned && matchDateFrom && matchDateTo;
+    });
+  }, [cases, search, statusFilter, assignedFilter, dateFrom, dateTo]);
+
+  const getLimBadge = (limDate: string) => {
+    if (!limDate) return null;
+    const d = daysUntil(limDate);
+    if (d < 0) return <Badge variant="secondary" className="text-xs">Past</Badge>;
+    if (d < 30) return <Badge variant="destructive" className="text-xs">{d}d — URGENT</Badge>;
+    if (d <= 60) return <Badge className="bg-warning text-warning-foreground text-xs">{d} days</Badge>;
+    return <Badge className="bg-success/20 text-success text-xs">{d} days</Badge>;
+  };
+
+  const getLimTextClass = (limDate: string) => {
+    if (!limDate) return "";
+    const d = daysUntil(limDate);
+    if (d >= 0 && d <= 7) return "text-destructive font-semibold";
+    if (d > 7 && d <= 30) return "text-orange-500";
+    return "";
+  };
 
   return (
     <AppLayout title="Cases">
-      <div className="flex gap-3 flex-wrap mb-4">
+      <div className="flex flex-wrap gap-3 mb-4 items-end">
         <Input
           placeholder="Search cases..."
           value={search}
           onChange={(e) => setSearch(e.target.value)}
-          className="w-64 h-9 text-sm"
+          className="h-9 text-sm w-64"
         />
         <Select value={statusFilter} onValueChange={setStatusFilter}>
-          <SelectTrigger className="w-40 h-9 text-sm">
-            <SelectValue placeholder="All Statuses" />
-          </SelectTrigger>
+          <SelectTrigger className="h-9 text-sm w-40"><SelectValue placeholder="Status" /></SelectTrigger>
           <SelectContent>
             <SelectItem value="all">All Statuses</SelectItem>
             {FILE_STATUSES.map((s) => <SelectItem key={s} value={s}>{s}</SelectItem>)}
           </SelectContent>
         </Select>
-        <Select value={typeFilter} onValueChange={setTypeFilter}>
-          <SelectTrigger className="w-44 h-9 text-sm">
-            <SelectValue placeholder="All Case Types" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">All Case Types</SelectItem>
-            {CASE_TYPES.map((t) => <SelectItem key={t} value={t}>{t}</SelectItem>)}
-          </SelectContent>
+        <Select value={assignedFilter} onValueChange={setAssignedFilter}>
+          <SelectTrigger className="h-9 text-sm w-44"><SelectValue /></SelectTrigger>
+          <SelectContent>{STAFF.map((s) => <SelectItem key={s} value={s}>{s}</SelectItem>)}</SelectContent>
         </Select>
+        <div className="flex items-center gap-1">
+          <span className="text-xs text-muted-foreground">DOL:</span>
+          <Input type="date" value={dateFrom} onChange={(e) => setDateFrom(e.target.value)} className="h-9 text-sm w-36" />
+          <span className="text-xs text-muted-foreground">to</span>
+          <Input type="date" value={dateTo} onChange={(e) => setDateTo(e.target.value)} className="h-9 text-sm w-36" />
+        </div>
+        <Button size="sm" onClick={() => navigate("/clients/new")}>
+          <Plus className="h-4 w-4 mr-1" /> New Case
+        </Button>
       </div>
 
       <Card>
@@ -106,55 +112,57 @@ export default function Cases() {
                 <TableHead className="text-xs">Client Name</TableHead>
                 <TableHead className="text-xs">Date of Loss</TableHead>
                 <TableHead className="text-xs">Status</TableHead>
-                <TableHead className="text-xs">Clerk</TableHead>
+                <TableHead className="text-xs">Clerk Assigned</TableHead>
                 <TableHead className="text-xs">Limitation Date</TableHead>
                 <TableHead className="text-xs">Days Until</TableHead>
-                <TableHead className="text-xs w-10"></TableHead>
+                <TableHead className="text-xs w-16"></TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
-              {loading ? (
-                <TableRow><TableCell colSpan={8} className="text-center text-muted-foreground py-8">Loading...</TableCell></TableRow>
-              ) : paginated.length === 0 ? (
-                <TableRow><TableCell colSpan={8} className="text-center text-muted-foreground py-8">No cases found.</TableCell></TableRow>
-              ) : (
-                paginated.map((c: any) => (
-                  <TableRow key={c.id} className="text-sm">
-                    <TableCell className="py-2 font-medium">{c.fileNo}</TableCell>
-                    <TableCell className="py-2">
-                      <Link to={`/cases/${c.id}`} className="hover:text-primary">{c.client?.firstName} {c.client?.lastName}</Link>
-                    </TableCell>
-                    <TableCell className="py-2">{formatDate(c.dateOfLoss)}</TableCell>
-                    <TableCell className="py-2">
-                      <Badge className={cn("text-xs", statusColor[c.fileStatus])}>{c.fileStatus}</Badge>
-                    </TableCell>
-                    <TableCell className="py-2">{c.clerkAssigned || "—"}</TableCell>
-                    <TableCell className="py-2 text-xs">{formatDate(c.limitationDate)}</TableCell>
-                    <TableCell className="py-2"><LimitationBadge date={c.limitationDate} /></TableCell>
-                    <TableCell className="py-2">
-                      <Button variant="ghost" size="icon" asChild className="h-7 w-7">
-                        <Link to={`/cases/${c.id}`}><Eye className="h-3.5 w-3.5" /></Link>
-                      </Button>
-                    </TableCell>
-                  </TableRow>
-                ))
+              {fetching && (
+                <TableRow>
+                  <TableCell colSpan={8} className="py-6 text-center text-sm text-muted-foreground">
+                    Loading cases...
+                  </TableCell>
+                </TableRow>
+              )}
+              {!fetching && filtered.map((c) => (
+                <TableRow
+                  key={c.id}
+                  className="cursor-pointer hover:bg-muted/50"
+                  onClick={() => navigate(`/cases/${c.id}`)}
+                >
+                  <TableCell className="py-2 text-sm font-medium">{c.fileNo}</TableCell>
+                  <TableCell className="py-2 text-sm">
+                    {c.client?.firstName} {c.client?.lastName}
+                  </TableCell>
+                  <TableCell className="py-2 text-sm">{formatDate(c.dateOfLoss)}</TableCell>
+                  <TableCell className="py-2">
+                    <Badge variant="outline" className="text-xs">{c.fileStatus}</Badge>
+                  </TableCell>
+                  <TableCell className="py-2 text-sm">{c.clerkAssigned}</TableCell>
+                  <TableCell className={cn("py-2 text-sm", getLimTextClass(c.limitationDate))}>
+                    {formatDate(c.limitationDate)}
+                  </TableCell>
+                  <TableCell className="py-2">{getLimBadge(c.limitationDate)}</TableCell>
+                  <TableCell className="py-2">
+                    <Button variant="ghost" size="icon" className="h-7 w-7">
+                      <Eye className="h-3.5 w-3.5" />
+                    </Button>
+                  </TableCell>
+                </TableRow>
+              ))}
+              {!fetching && filtered.length === 0 && (
+                <TableRow>
+                  <TableCell colSpan={8} className="py-6 text-center text-sm text-muted-foreground">
+                    No cases found.
+                  </TableCell>
+                </TableRow>
               )}
             </TableBody>
           </Table>
         </CardContent>
       </Card>
-
-      {totalPages > 1 && (
-        <div className="flex items-center justify-between mt-4">
-          <p className="text-sm text-muted-foreground">
-            Showing {(page - 1) * PAGE_SIZE + 1}–{Math.min(page * PAGE_SIZE, cases.length)} of {cases.length}
-          </p>
-          <div className="flex gap-2">
-            <Button variant="outline" size="sm" disabled={page === 1} onClick={() => setPage(page - 1)}>Previous</Button>
-            <Button variant="outline" size="sm" disabled={page === totalPages} onClick={() => setPage(page + 1)}>Next</Button>
-          </div>
-        </div>
-      )}
     </AppLayout>
   );
 }
