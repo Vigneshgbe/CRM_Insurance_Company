@@ -21,22 +21,26 @@ export default function Login() {
     setError("");
     setLoading(true);
 
-    setTimeout(async () => {
-      const success = await login(email, password);
-      if (success) {
-        const stored = sessionStorage.getItem("crm_user");
-        const user = stored ? JSON.parse(stored) : null;
-        toast({ title: "Welcome back!", description: "Logged in successfully." });
-        if (user?.role === "client") {
-          navigate("/portal");
-        } else {
-          navigate("/dashboard");
-        }
+    // No setTimeout — call login directly, no artificial delay
+    const success = await login(email, password);
+
+    if (success) {
+      toast({ title: "Welcome back!", description: "Logged in successfully." });
+
+      // Read role directly from localStorage (auth.tsx saves there)
+      const raw = localStorage.getItem("crm_user");
+      const user = raw ? JSON.parse(raw) : null;
+
+      if (user?.role === "client") {
+        navigate("/portal");
       } else {
-        setError("Invalid credentials. Try: vignesh@thepadak.com / password (employee) or thikilan@thepadak.com / password (client)");
+        navigate("/dashboard");
       }
-      setLoading(false);
-    }, 800);
+    } else {
+      setError("Invalid email or password. Please try again.");
+    }
+
+    setLoading(false);
   };
 
   return (
@@ -50,23 +54,37 @@ export default function Login() {
           <form onSubmit={handleSubmit} className="space-y-4">
             <div className="space-y-1.5">
               <Label htmlFor="email">Email</Label>
-              <Input id="email" type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="vignesh@thepadak.com" required />
+              <Input
+                id="email"
+                type="email"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                placeholder="you@example.com"
+                required
+                autoComplete="email"
+              />
             </div>
             <div className="space-y-1.5">
               <Label htmlFor="password">Password</Label>
-              <Input id="password" type="password" value={password} onChange={(e) => setPassword(e.target.value)} placeholder="••••••••" required />
+              <Input
+                id="password"
+                type="password"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                placeholder="••••••••"
+                required
+                autoComplete="current-password"
+              />
             </div>
-            {error && <p className="text-sm text-destructive">{error}</p>}
+            {error && (
+              <p className="text-sm text-destructive bg-destructive/10 px-3 py-2 rounded">
+                {error}
+              </p>
+            )}
             <Button type="submit" className="w-full" disabled={loading}>
               {loading ? "Signing in..." : "Sign In"}
             </Button>
           </form>
-          <div className="mt-4 border-t pt-3">
-            <p className="text-xs text-muted-foreground text-center mb-1">Demo Accounts:</p>
-            <p className="text-xs text-muted-foreground text-center">Employee: vignesh@thepadak.com</p>
-            <p className="text-xs text-muted-foreground text-center">Client: thikilan@thepadak.com</p>
-            <p className="text-xs text-muted-foreground text-center">Password: password</p>
-          </div>
         </CardContent>
       </Card>
     </div>
