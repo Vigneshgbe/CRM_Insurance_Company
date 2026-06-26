@@ -3,29 +3,25 @@ import pool from '../config/database';
 import { generateId } from '../utils/helpers';
 
 // ── GET /api/editor-documents?caseId=xxx  ────────────────────────────────────
+// No JOINs at all — avoids collation conflicts between tables.
 export async function listEditorDocuments(req: Request, res: Response) {
   try {
     const { caseId } = req.query;
 
-    // Simple query — no JOINs that can fail on unknown column names.
-    // Only join users (safe — we know the column is `name`).
-    // cases/clients join is optional metadata; skip it to avoid 500s.
     let sql = `
       SELECT
-        ed.id,
-        ed.title,
-        ed.case_id,
-        ed.created_by,
-        ed.created_at,
-        ed.updated_at,
-        u.name AS created_by_name
-      FROM editor_documents ed
-      LEFT JOIN users u ON u.id = ed.created_by
+        id,
+        title,
+        case_id,
+        created_by,
+        created_at,
+        updated_at
+      FROM editor_documents
       WHERE 1=1
     `;
     const params: any[] = [];
-    if (caseId) { sql += ' AND ed.case_id = ?'; params.push(caseId); }
-    sql += ' ORDER BY ed.updated_at DESC LIMIT 200';
+    if (caseId) { sql += ' AND case_id = ?'; params.push(caseId); }
+    sql += ' ORDER BY updated_at DESC LIMIT 200';
 
     const [rows] = await pool.query(sql, params) as any[];
     res.json(Array.isArray(rows) ? rows : []);
@@ -36,15 +32,13 @@ export async function listEditorDocuments(req: Request, res: Response) {
 }
 
 // ── GET /api/editor-documents/:id  ───────────────────────────────────────────
+// No JOIN — collation mismatch between editor_documents (unicode_ci) and
+// users (general_ci) causes ER_CANT_AGGREGATE_2COLLATIONS on the JOIN.
 export async function getEditorDocument(req: Request, res: Response) {
   try {
     const { id } = req.params;
     const [rows]: any = await pool.query(
-      `SELECT ed.*,
-              u.name AS created_by_name
-       FROM editor_documents ed
-       LEFT JOIN users u ON u.id = ed.created_by
-       WHERE ed.id = ? LIMIT 1`,
+      `SELECT * FROM editor_documents WHERE id = ? LIMIT 1`,
       [id]
     );
     if (!rows.length) return res.status(404).json({ error: 'Document not found' });
@@ -94,8 +88,8 @@ export async function updateEditorDocument(req: Request, res: Response) {
     );
     if (!existing.length) return res.status(404).json({ error: 'Document not found' });
 
-    // Only block if created_by is set AND belongs to a different user.
-    // If created_by is empty/null (old records), allow the edit.
+    // Only block if created_by is a non-empty value owned by a different user.
+    // Empty/null created_by (old rows before fix) are allowed through.
     const owner = existing[0].created_by;
     if (owner && owner !== '' && owner !== userId) {
       return res.status(403).json({ error: 'Not authorised to edit this document' });
