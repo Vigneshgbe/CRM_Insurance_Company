@@ -45,7 +45,7 @@ export function AppSidebar() {
     <aside className="hidden md:flex flex-col w-60 min-h-screen bg-sidebar text-sidebar-foreground fixed left-0 top-0 z-30">
       {/* Logo */}
       <div className="h-14 flex items-center px-5 border-b border-sidebar-muted">
-        <span className="text-lg font-bold tracking-tight">Hypernova CRM</span>
+        <span className="text-lg font-bold tracking-tight">Padak's CRM</span>
       </div>
 
       {/* Navigation */}
