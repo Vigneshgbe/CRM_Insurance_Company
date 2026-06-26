@@ -874,6 +874,508 @@ function OCF23Form({ f, set, af }: { f:Record<string,string>; set:(k:string,v:st
   </>);
 }
 
+// ════════════════════════════════════════════════════════════════════════════════
+// MATRIX LEGAL SERVICES — INTERNAL INTAKE FORM (10 pages)
+// Based on INTAKE_MASTER_07-04-2026.pdf — all sections faithfully reproduced
+// ════════════════════════════════════════════════════════════════════════════════
+
+// Post-accident conditions from page 6 of the intake PDF
+const PHYSICAL_AREAS = [
+  "Head","Face L/R","Eyes L/R","Nose L/R","Ears L/R","Jaw L/R","Teeth L/R","Neck L/R",
+  "Shoulders L/R","Arms L/R","Wrists L/R","Hands L/R","Fingers L/R","Chest","Ribs L/R",
+  "Abdomen L/R","Upper Back","Mid Back","Lower Back","Hips L/R","Pelvis L/R","Thighs L/R",
+  "Knees L/R","Legs L/R","Ankles L/R","Feet L/R","Toes L/R",
+  "Radiating pain down Arm(s) L/R","Radiating pain down Leg(s) L/R",
+];
+
+const NEURO_PSYCH = [
+  "Headaches","Dizziness","Ringing in the ears","Problems with hearing","Blurred Vision",
+  "Forgetfulness","Tingling","Numbness","Irritability","Anxiety","Stress","Depression",
+  "Lack of sleep","Nightmares (general)","Flashbacks to MVA","Periodic crying",
+  "Low self-esteem","Loss of incentive","Fear of Driving","Nervous when a passenger",
+  "Withdraw from others","Poor appetite","Loss of weight","Decrease sex drive",
+  "Fatigue/low energy","Short-tempered","Spousal arguments","Over-react to small things",
+  "Excessive worry","Suicidal thought",
+];
+
+function MatrixIntakeForm({ f, set, af }: { f:Record<string,string>; set:(k:string,v:string)=>void; af:Set<string> }) {
+  return (<>
+    {/* ── Page 1: Initial Interview Header ── */}
+    <Section title="Initial Interview — Header">
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+        <Radio label="Conflict Checked?" name="conflictChecked" opts={["Yes","No"]} k="conflictChecked" f={f} set={set} />
+        <Radio label="Conflict Find?" name="conflictFind" opts={["Yes","No"]} k="conflictFind" f={f} set={set} />
+        <F label="File No." k="fileNo" f={f} set={set} af={af} />
+        <F label="Percent (%)" k="percent" f={f} set={set} af={af} />
+      </div>
+      <G2>
+        <F label="Date of MVA" k="dateOfMVA" f={f} set={set} af={af} type="date" />
+        <F label="Client Interviewed By" k="interviewedBy" f={f} set={set} af={af} />
+        <F label="Client Interviewed On" k="interviewedOn" f={f} set={set} af={af} type="date" />
+        <F label="Client Referred By" k="referredBy" f={f} set={set} af={af} />
+      </G2>
+    </Section>
+
+    {/* ── Page 1-2: Personal Data ── */}
+    <Section title="Part Two: Personal Data">
+      <div className="grid grid-cols-3 gap-3">
+        <Radio label="Gender" name="gender" opts={["Male","Female"]} k="gender" f={f} set={set} />
+        <F label="Last Name" k="lastName" f={f} set={set} af={af} />
+        <F label="First Name" k="firstName" f={f} set={set} af={af} />
+      </div>
+      <F label="First and Last Name (combined)" k="fullName" f={f} set={set} af={af} />
+      <div className="grid grid-cols-4 gap-3">
+        <F label="Unit No" k="unitNo" f={f} set={set} af={af} />
+        <div className="col-span-3"><F label="Street No & Name" k="streetAddress" f={f} set={set} af={af} /></div>
+      </div>
+      <G3>
+        <F label="City" k="city" f={f} set={set} af={af} />
+        <F label="Province" k="province" f={f} set={set} af={af} />
+        <F label="Post Code" k="postalCode" f={f} set={set} af={af} />
+      </G3>
+      <G3>
+        <F label="Date of Birth (yyyy/mm/dd)" k="dateOfBirth" f={f} set={set} af={af} type="date" />
+        <F label="Age" k="age" f={f} set={set} af={af} />
+        <div />
+      </G3>
+      <G3>
+        <F label="Home Phone" k="homePhone" f={f} set={set} af={af} />
+        <F label="Cell Phone" k="cellPhone" f={f} set={set} af={af} />
+        <F label="Work Phone" k="workPhone" f={f} set={set} af={af} />
+        <F label="E-Mail" k="email" f={f} set={set} af={af} />
+      </G3>
+      <Radio label="Marital Status" name="maritalStatus" opts={["Single","Married","C-Law","Separated","Divorced","Widow"]} k="maritalStatus" f={f} set={set} />
+
+      {/* ID Documents */}
+      <div className="space-y-2 border rounded-md p-3 mt-2">
+        <Label className="text-xs font-semibold">Identification Documents</Label>
+        {[
+          ["driverLicenseNo","driverLicenseCopy","Driver's License No."],
+          ["healthCardNo","healthCardCopy","Health Card No."],
+          ["sinNo","sinCopy","Social Insurance No."],
+        ].map(([numKey,copyKey,lbl]) => (
+          <div key={numKey} className="grid grid-cols-12 gap-2 items-center">
+            <Label className="col-span-4 text-xs">{lbl}</Label>
+            <div className="col-span-5"><Input value={f[numKey]||""} onChange={e=>set(numKey,e.target.value)} className="h-8 text-xs" /></div>
+            <div className="col-span-3 flex items-center gap-2">
+              <Label className="text-xs">Copy?</Label>
+              <Radio label="" name={copyKey} opts={["Yes","No"]} k={copyKey} f={f} set={set} />
+            </div>
+          </div>
+        ))}
+        <div className="grid grid-cols-12 gap-2 items-center">
+          <div className="col-span-4 flex gap-3">
+            <Chk label="Ontario ID Card" k="hasOntarioID" f={f} set={set} />
+            <Chk label="PR" k="hasPR" f={f} set={set} />
+            <Chk label="Citizen" k="hasCitizen" f={f} set={set} />
+          </div>
+          <div className="col-span-5"><F label="No." k="prCitizenNo" f={f} set={set} af={af} /></div>
+          <div className="col-span-3 flex items-center gap-2">
+            <Label className="text-xs">Copy?</Label>
+            <Radio label="" name="prCitizenCopy" opts={["Yes","No"]} k="prCitizenCopy" f={f} set={set} />
+          </div>
+        </div>
+      </div>
+
+      <div className="grid grid-cols-2 gap-3">
+        <Radio label="Dependants?" name="hasDependants" opts={["Yes","No"]} k="hasDependants" f={f} set={set} />
+        {f.hasDependants==="Yes" && <F label="Number of dependants" k="numDependants" f={f} set={set} af={af} />}
+      </div>
+
+      <div>
+        <Label className="text-xs mb-2 block">Client chooses to receive the following benefit:</Label>
+        <div className="flex flex-wrap gap-4">
+          {["Income Replacement Benefit","Non-Earner Benefit","Caregiver Benefit"].map(b => (
+            <label key={b} className="flex items-center gap-2 text-sm cursor-pointer">
+              <input type="radio" name="benefitChoice" value={b} checked={f.benefitChoice===b} onChange={()=>set("benefitChoice",b)} className="h-3.5 w-3.5" />
+              {b}
+            </label>
+          ))}
+        </div>
+      </div>
+    </Section>
+
+    {/* ── Page 2: Language / Accident Details ── */}
+    <Section title="Language & Background">
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+        <Radio label="Does the client speak English?" name="speaksEnglish" opts={["Yes","No"]} k="speaksEnglish" f={f} set={set} />
+        <Radio label="Requires an interpreter?" name="needsInterpreter" opts={["Yes","No"]} k="needsInterpreter" f={f} set={set} />
+        {f.needsInterpreter==="Yes" && <F label="Language?" k="interpreterLanguage" f={f} set={set} af={af} />}
+        <Radio label="Was client born in Canada?" name="bornInCanada" opts={["Yes","No"]} k="bornInCanada" f={f} set={set} />
+        {f.bornInCanada==="No" && <><F label="Where?" k="bornWhere" f={f} set={set} af={af} /><F label="Year immigrated to Canada?" k="yearImmigrated" f={f} set={set} af={af} /></>}
+      </div>
+      <div>
+        <Label className="text-xs mb-2 block">Client was a:</Label>
+        <div className="flex flex-wrap gap-3">
+          {["Driver of Vehicle Insured under this Policy","Passenger of Vehicle Insured under this Policy","Pedestrian or Cyclist","Driver or Passenger of a vehicle not insured under this Policy"].map(r => <Chk key={r} label={r} k={`role_${r}`} f={f} set={set} />)}
+        </div>
+        <F label="Other" k="roleOther" f={f} set={set} af={af} />
+      </div>
+      <Radio label="Seat Belted?" name="seatBelted" opts={["Yes","No"]} k="seatBelted" f={f} set={set} />
+    </Section>
+
+    <Section title="Accident Details">
+      <Radio label="Did the accident occur while at work?" name="accidentAtWork" opts={["Yes","No"]} k="accidentAtWork" f={f} set={set} />
+      {f.accidentAtWork==="Yes" && <Radio label="If yes, did client file claim with W.S.I.B?" name="wsibClaim" opts={["Yes","No"]} k="wsibClaim" f={f} set={set} />}
+      <div>
+        <Label className="text-xs mb-2 block font-medium">Accident Location</Label>
+        <G3>
+          <F label="Street Name" k="accidentStreet" f={f} set={set} af={af} />
+          <F label="Major Intersection" k="accidentIntersection" f={f} set={set} af={af} />
+          <F label="City" k="accidentCity" f={f} set={set} af={af} />
+          <F label="Province" k="accidentProvince" f={f} set={set} af={af} />
+          <F label="Time of M.V.A" k="timeOfMVA" f={f} set={set} af={af} type="time" />
+        </G3>
+      </div>
+      <G2>
+        <Radio label="Accident Reported to the Police?" name="policeReported" opts={["Yes","No"]} k="policeReported" f={f} set={set} />
+        {f.policeReported==="Yes" && <F label="Date of Report" k="policeReportDate" f={f} set={set} af={af} type="date" />}
+        <Radio label="Did Police come to Scene?" name="policeCameToScene" opts={["Yes","No"]} k="policeCameToScene" f={f} set={set} />
+        <F label="Police Department / Collision Reporting Centre" k="policeDepartment" f={f} set={set} af={af} />
+        <F label="Incident No." k="incidentNo" f={f} set={set} af={af} />
+        <F label="Officer" k="officerName" f={f} set={set} af={af} />
+        <F label="Badge No." k="badgeNo" f={f} set={set} af={af} />
+      </G2>
+      <G2>
+        <Radio label="Was the client charged?" name="clientCharged" opts={["Yes","No"]} k="clientCharged" f={f} set={set} />
+        {f.clientCharged==="Yes" && <F label="Description" k="clientChargedDesc" f={f} set={set} af={af} />}
+        <Radio label="Was Third Party charged?" name="thirdPartyCharged" opts={["Yes","No"]} k="thirdPartyCharged" f={f} set={set} />
+        {f.thirdPartyCharged==="Yes" && <F label="Description" k="thirdPartyChargedDesc" f={f} set={set} af={af} />}
+      </G2>
+      <G3>
+        <F label="Number of Occupants in Vehicle" k="numOccupants" f={f} set={set} af={af} />
+        <F label="Seating Arrangement" k="seatingArrangement" f={f} set={set} af={af} />
+        <Radio label="Photos of damages?" name="photosOfDamage" opts={["Yes","No"]} k="photosOfDamage" f={f} set={set} />
+        <F label="Estimated Property Damage ($)" k="estimatedDamage" f={f} set={set} af={af} />
+      </G3>
+      <F label="Brief description of how the accident occurred" k="accidentDescription" f={f} set={set} af={af} type="textarea" rows={4} />
+    </Section>
+
+    {/* ── Page 3: Insurance Company (First Party) ── */}
+    <Section title="Insurance Company Information">
+      <div className="flex flex-wrap gap-4 mb-3">
+        {["Own Policy","Dependant Policy","Spousal Policy","Listed as Driver"].map(p => <Chk key={p} label={p} k={`policyType_${p}`} f={f} set={set} />)}
+      </div>
+      <div className="border-l-4 border-primary pl-4 space-y-3">
+        <Label className="text-xs font-bold uppercase tracking-wide">First Party Insurance Information</Label>
+        <F label="Name of Insurance Company" k="fp_insurerName" f={f} set={set} af={af} />
+        <F label="Address" k="fp_insurerAddress" f={f} set={set} af={af} />
+        <G3>
+          <F label="City" k="fp_insurerCity" f={f} set={set} af={af} />
+          <F label="Province" k="fp_insurerProvince" f={f} set={set} af={af} />
+          <F label="Post Code" k="fp_insurerPC" f={f} set={set} af={af} />
+        </G3>
+        <G2>
+          <F label="Adjuster" k="fp_adjuster" f={f} set={set} af={af} />
+          <F label="E-mail" k="fp_adjusterEmail" f={f} set={set} af={af} />
+          <F label="Phone No." k="fp_phone" f={f} set={set} af={af} />
+          <F label="Fax No." k="fp_fax" f={f} set={set} af={af} />
+          <F label="Policy No." k="fp_policyNo" f={f} set={set} af={af} />
+          <F label="Claim No." k="fp_claimNo" f={f} set={set} af={af} />
+          <F label="Name of Policy Holder" k="fp_policyHolder" f={f} set={set} af={af} />
+        </G2>
+        <G3>
+          <F label="Automobile Make" k="fp_autoMake" f={f} set={set} af={af} />
+          <F label="Model" k="fp_autoModel" f={f} set={set} af={af} />
+          <F label="Year" k="fp_autoYear" f={f} set={set} af={af} />
+          <F label="License Plate Number" k="fp_plateNo" f={f} set={set} af={af} />
+        </G3>
+        <Radio label="Was the client an occupant of this vehicle at the time of the accident?" name="fp_occupant" opts={["Yes","No"]} k="fp_wasOccupant" f={f} set={set} />
+        <div className="flex flex-wrap gap-3">
+          {["Employee of the Policyholder","I have no relationship to the Policyholder","A vehicle you rented or leased for more than 30 days"].map(r => <Chk key={r} label={r} k={`fp_rel_${r}`} f={f} set={set} />)}
+        </div>
+        <Radio label="Aware of any coverage under any other policies?" name="fp_otherCoverage" opts={["Yes","No","I don't know"]} k="fp_otherCoverage" f={f} set={set} />
+      </div>
+    </Section>
+
+    {/* ── Page 4: Third Party Insurance ── */}
+    <Section title="Third Party Insurance Information">
+      <G2>
+        <F label="Driver (name)" k="tp_driverName" f={f} set={set} af={af} />
+        <F label="Driver's License No." k="tp_driverLicenseNo" f={f} set={set} af={af} />
+        <F label="Address" k="tp_driverAddress" f={f} set={set} af={af} />
+        <F label="Phone No." k="tp_driverPhone" f={f} set={set} af={af} />
+        <F label="Name of Insurance Company" k="tp_insurerName" f={f} set={set} af={af} />
+        <F label="Address" k="tp_insurerAddress" f={f} set={set} af={af} />
+        <F label="Name of Adjuster" k="tp_adjuster" f={f} set={set} af={af} />
+        <F label="Phone No." k="tp_phone" f={f} set={set} af={af} />
+        <F label="Fax No." k="tp_fax" f={f} set={set} af={af} />
+        <F label="Policy No." k="tp_policyNo" f={f} set={set} af={af} />
+        <F label="Claim No." k="tp_claimNo" f={f} set={set} af={af} />
+        <F label="Name of Policy Holder" k="tp_policyHolder" f={f} set={set} af={af} />
+      </G2>
+      <G3>
+        <F label="Automobile Make" k="tp_autoMake" f={f} set={set} af={af} />
+        <F label="Model" k="tp_autoModel" f={f} set={set} af={af} />
+        <F label="Year" k="tp_autoYear" f={f} set={set} af={af} />
+        <F label="License Plate Number" k="tp_plateNo" f={f} set={set} af={af} />
+      </G3>
+    </Section>
+
+    {/* ── Page 4-5: Medical & Treatment ── */}
+    <Section title="Medical & Treatment Information">
+      <G2>
+        <Radio label="Did the client go to Hospital?" name="wentHospital" opts={["Yes","No"]} k="wentToHospital" f={f} set={set} />
+        <Radio label="Ambulance required?" name="ambulance" opts={["Yes","No"]} k="ambulanceRequired" f={f} set={set} />
+      </G2>
+      {f.wentToHospital==="Yes" && (
+        <div className="border rounded p-3 space-y-2">
+          <F label="Name of Hospital" k="hospitalName" f={f} set={set} af={af} />
+          <F label="Address" k="hospitalAddress" f={f} set={set} af={af} />
+          <G3>
+            <F label="Admission Date" k="admissionDate" f={f} set={set} af={af} type="date" />
+            <F label="Discharge Date" k="dischargeDate" f={f} set={set} af={af} type="date" />
+            <Radio label="X-Ray Taken?" name="xrayTaken" opts={["Yes","No"]} k="xrayTaken" f={f} set={set} />
+          </G3>
+        </div>
+      )}
+
+      <div className="border-t pt-3">
+        <Label className="text-xs font-semibold mb-2 block">Family Doctor</Label>
+        <F label="Family Physician" k="familyDoctor" f={f} set={set} af={af} />
+        <F label="Address" k="familyDoctorAddress" f={f} set={set} af={af} />
+        <G3>
+          <F label="City" k="familyDoctorCity" f={f} set={set} af={af} />
+          <F label="Province" k="familyDoctorProvince" f={f} set={set} af={af} />
+          <F label="Post Code" k="familyDoctorPC" f={f} set={set} af={af} />
+          <F label="Phone No." k="familyDoctorPhone" f={f} set={set} af={af} />
+          <F label="Fax No." k="familyDoctorFax" f={f} set={set} af={af} />
+        </G3>
+      </div>
+    </Section>
+
+    <Section title="Physio, Chiro, Massage & Treatment Providers">
+      {[1,2,3,4].map(n => (
+        <div key={n} className="border rounded p-3 space-y-2">
+          <Label className="text-xs font-semibold">Treatment Provider #{n}</Label>
+          <F label="Treatment Centre" k={`tp${n}_centre`} f={f} set={set} af={af} />
+          <F label="Address" k={`tp${n}_address`} f={f} set={set} af={af} />
+          <G2>
+            <F label="Phone No." k={`tp${n}_phone`} f={f} set={set} af={af} />
+            <F label="Fax No." k={`tp${n}_fax`} f={f} set={set} af={af} />
+          </G2>
+          <div>
+            <Label className="text-xs mb-1 block">Type of Treatment</Label>
+            <div className="flex flex-wrap gap-3">
+              {["Physio","Chiro","Rehab","Psych","Massage"].map(t => <Chk key={t} label={t} k={`tp${n}_type_${t}`} f={f} set={set} />)}
+            </div>
+          </div>
+        </div>
+      ))}
+      <div>
+        <Label className="text-xs font-semibold mb-2 block">List of Medication Prescribed</Label>
+        <div className="grid grid-cols-2 gap-2">
+          {[1,2,3,4].map(n => <F key={n} label={`Medication ${n}`} k={`medication${n}`} f={f} set={set} af={af} />)}
+        </div>
+      </div>
+    </Section>
+
+    {/* ── Page 6: Post-accident conditions ── */}
+    <Section title="Post-Accident Medical Conditions" defaultOpen={false}>
+      <p className="text-xs text-muted-foreground mb-2">Select all areas of pain and discomfort:</p>
+      <div>
+        <Label className="text-xs font-medium mb-1.5 block">Physical Areas</Label>
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-1.5">
+          {PHYSICAL_AREAS.map(c => <Chk key={c} label={c} k={`postPhysical_${c}`} f={f} set={set} />)}
+        </div>
+      </div>
+      <div className="mt-3">
+        <Label className="text-xs font-medium mb-1.5 block">Neurological & Psychological Symptoms</Label>
+        <div className="grid grid-cols-2 md:grid-cols-3 gap-1.5">
+          {NEURO_PSYCH.map(c => <Chk key={c} label={c} k={`postNeuro_${c}`} f={f} set={set} />)}
+        </div>
+      </div>
+
+      <div className="border-t pt-3 mt-3">
+        <Label className="text-xs font-semibold mb-2 block">Pre-Accident Medical Conditions</Label>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+          <F label="Condition" k="preCondition" f={f} set={set} af={af} />
+          <F label="Time Frame" k="preTimeFrame" f={f} set={set} af={af} />
+          <F label="Operative Procedure" k="preOperativeProcedure" f={f} set={set} af={af} />
+          <F label="Pre-accident Status" k="preAccidentStatus" f={f} set={set} af={af} />
+          <F label="Post-accident Status" k="postAccidentStatus" f={f} set={set} af={af} />
+        </div>
+      </div>
+    </Section>
+
+    {/* ── Page 7-8: Financial & Income ── */}
+    <Section title="Financial & Income Information">
+      <div>
+        <Label className="text-xs mb-2 block font-medium">Employment Status at Time of Accident</Label>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+          {[
+            ["empFullTime","Employed — highest average weekly income (last 52 weeks / last 4 weeks)"],
+            ["empSelfEmployed","Self-Employed"],
+            ["empUnemployed26","Unemployed but worked 26 weeks in last 52 weeks"],
+            ["empContract","Written contract/agreement to start work within one year"],
+            ["empEI","Client is receiving E.I. benefits"],
+            ["empUnemployed","Unemployed"],
+            ["empRetired","Retired"],
+            ["empStudent","Student or Recent Graduate"],
+            ["empCaregiver","Caregiver"],
+          ].map(([k,lbl]) => <Chk key={k} label={lbl} k={k} f={f} set={set} />)}
+        </div>
+      </div>
+      <Radio label="Loss of Income / Loss Competitive Advantage Claim?" name="lossOfIncome" opts={["Yes","No"]} k="lossOfIncome" f={f} set={set} />
+
+      {[1,2,3].map(n => (
+        <div key={n} className="border rounded p-3 space-y-2">
+          <Label className="text-xs font-semibold">Current Employer {n}</Label>
+          <G2>
+            <F label="Employer" k={`emp${n}_name`} f={f} set={set} af={af} />
+            <F label="Address" k={`emp${n}_address`} f={f} set={set} af={af} />
+            <F label="Phone" k={`emp${n}_phone`} f={f} set={set} af={af} />
+            <F label="Fax" k={`emp${n}_fax`} f={f} set={set} af={af} />
+            <F label="Occupation" k={`emp${n}_occupation`} f={f} set={set} af={af} />
+            <F label="Salary / Wages ($)" k={`emp${n}_salary`} f={f} set={set} af={af} />
+            <F label="Hours worked (per week)" k={`emp${n}_hoursPerWeek`} f={f} set={set} af={af} />
+            <F label="Length of Employment" k={`emp${n}_length`} f={f} set={set} af={af} />
+            <F label="Last Day Worked" k={`emp${n}_lastDay`} f={f} set={set} af={af} type="date" />
+          </G2>
+          <div>
+            <Label className="text-xs mb-1 block">Nature of Work</Label>
+            <div className="flex gap-4">{["Light","Medium","Heavy"].map(t => <Chk key={t} label={t} k={`emp${n}_nature_${t}`} f={f} set={set} />)}</div>
+          </div>
+        </div>
+      ))}
+      <Radio label="Did client go back to Work?" name="returnedToWork" opts={["Yes","No"]} k="returnedToWork" f={f} set={set} />
+    </Section>
+
+    {/* ── Page 8: Caregiver ── */}
+    <Section title="Caregiver Information">
+      <Radio label="Was the client the primary caregiver for anyone (children under 16 or dependents mentally disabled) prior to the M.V.A?" name="wasPrimaryCaregiver" opts={["Yes","No"]} k="wasPrimaryCaregiver" f={f} set={set} />
+      {f.wasPrimaryCaregiver==="Yes" && (
+        <>
+          <div className="space-y-2">
+            {[1,2,3,4,5,6].map(n => (
+              <div key={n} className="grid grid-cols-7 gap-2 items-center">
+                <Label className="text-xs">{n}.</Label>
+                <div className="col-span-3"><F label={n===1?"Name":""} k={`cg${n}_name`} f={f} set={set} af={af} /></div>
+                <div className="col-span-2"><F label={n===1?"Date of Birth":""} k={`cg${n}_dob`} f={f} set={set} af={af} type="date" /></div>
+                <div className="flex items-center gap-1"><Label className="text-xs">Disabled?</Label><Radio label="" name={`cg${n}_disabled`} opts={["Yes","No"]} k={`cg${n}_disabled`} f={f} set={set} /></div>
+              </div>
+            ))}
+          </div>
+          <Radio label="Do the client's injuries prevent him/her from performing caregiving activities?" name="injuriesPreventCaregiving" opts={["Yes","No"]} k="injuriesPreventCaregiving" f={f} set={set} />
+          <G2>
+            <F label="From (date unable to provide care)" k="caregivingFrom" f={f} set={set} af={af} type="date" />
+            <F label="Return to caregiving duties?" k="caregivingReturn" f={f} set={set} af={af} type="date" />
+          </G2>
+          <F label="Explanation" k="caregivingExplanation" f={f} set={set} af={af} type="textarea" />
+        </>
+      )}
+    </Section>
+
+    {/* ── Page 9: Education / Other Insurance ── */}
+    <Section title="Education / Training">
+      <F label="Name of Institution" k="eduInstitution" f={f} set={set} af={af} />
+      <F label="Address" k="eduAddress" f={f} set={set} af={af} />
+      <G3>
+        <Radio label="Client still attending school?" name="stillAttending" opts={["Yes","No"]} k="stillAttendingSchool" f={f} set={set} />
+        <F label="Date Last Attended" k="dateLastAttended" f={f} set={set} af={af} type="date" />
+        <F label="Projected Completion" k="projectedCompletion" f={f} set={set} af={af} type="date" />
+      </G3>
+      <F label="Career Goals" k="careerGoals" f={f} set={set} af={af} />
+      <G2>
+        <Radio label="Was client able to return to school following M.V.A?" name="returnedSchool" opts={["Yes","No"]} k="returnedToSchool" f={f} set={set} />
+        {f.returnedToSchool==="Yes" && <F label="Date returned" k="returnedSchoolDate" f={f} set={set} af={af} type="date" />}
+      </G2>
+      <G2>
+        <F label="Course/Activities Dropped 1" k="courseDropped1" f={f} set={set} af={af} />
+        <F label="Course/Activities Dropped 2" k="courseDropped2" f={f} set={set} af={af} />
+      </G2>
+    </Section>
+
+    <Section title="Other Insurance / Collateral Benefits">
+      <Radio label="Does the client or spouse or anyone dependent on them have any other benefit plan?" name="otherBenefitPlan" opts={["Yes","No"]} k="hasOtherBenefitPlan" f={f} set={set} />
+      {f.hasOtherBenefitPlan==="Yes" && (
+        <G3>
+          <F label="Name of Insurance" k="otherInsuranceName" f={f} set={set} af={af} />
+          <F label="Type of Insurance" k="otherInsuranceType" f={f} set={set} af={af} />
+          <F label="Policy/Certificate No." k="otherInsurancePolicyNo" f={f} set={set} af={af} />
+        </G3>
+      )}
+      {[
+        ["receivedDisabilityIncome","In the last 52 weeks, has the client received any income from a disability plan?","disabilityFrom","disabilityTo"],
+        ["receivingEI","Is the client receiving employment insurance benefits?","eiFrom","eiTo"],
+        ["receivingWelfare","Is the client receiving social assistance (Welfare)?","welfareFrom","welfareTo"],
+      ].map(([k,lbl,fromK,toK]) => (
+        <div key={k as string}>
+          <Radio label={lbl as string} name={k as string} opts={["Yes","No"]} k={k as string} f={f} set={set} />
+          {f[k as string]==="Yes" && <G2><F label="From" k={fromK as string} f={f} set={set} af={af} type="date" /><F label="To" k={toK as string} f={f} set={set} af={af} type="date" /></G2>}
+        </div>
+      ))}
+    </Section>
+
+    {/* ── Page 10: Income Tax / Expenses ── */}
+    <Section title="Income Tax Status">
+      <Radio label="Was the client paying support on the date of the accident?" name="payingSupport" opts={["Yes","No"]} k="payingSupport" f={f} set={set} />
+      {f.payingSupport==="Yes" && <G2><F label="From (date)" k="supportFrom" f={f} set={set} af={af} type="date" /><F label="Total paid ($)" k="supportTotalPaid" f={f} set={set} af={af} /></G2>}
+      <Radio label="Marital status for tax purposes" name="taxMaritalStatus" opts={["Single","Married","Equivalent to married"]} k="taxMaritalStatus" f={f} set={set} />
+      <G2>
+        <F label="Expected annual income of spouse (calendar year of MVA) ($)" k="spouseIncome1" f={f} set={set} af={af} />
+        <F label="Expected annual income of spouse (following calendar year) ($)" k="spouseIncome2" f={f} set={set} af={af} />
+      </G2>
+      <Radio label="Did the client claim the disability amount non-refundable tax credit on their recent income tax return?" name="taxDisabilityClaim" opts={["Yes","No"]} k="taxDisabilityClaim" f={f} set={set} />
+    </Section>
+
+    <Section title="Expense Information (Housekeeper / Caregiver / Care Person)">
+      {[
+        ["hk","Housekeeper"],
+        ["carg","Caregiver"],
+        ["care","Care Person"],
+      ].map(([p,lbl]) => (
+        <div key={p} className="border rounded p-3 space-y-2">
+          <Label className="text-xs font-semibold">{lbl}</Label>
+          <G2>
+            <F label={`Name of ${lbl}`} k={`${p}_name`} f={f} set={set} af={af} />
+            <F label="Address" k={`${p}_address`} f={f} set={set} af={af} />
+            <F label="Phone" k={`${p}_phone`} f={f} set={set} af={af} />
+            <F label="No. of hours worked per week" k={`${p}_hoursPerWeek`} f={f} set={set} af={af} />
+            <F label="Amount paid per week ($)" k={`${p}_amountPerWeek`} f={f} set={set} af={af} />
+          </G2>
+          <div className="flex gap-4"><Chk label="Cash" k={`${p}_cash`} f={f} set={set} /><Chk label="Cheques" k={`${p}_cheques`} f={f} set={set} /></div>
+        </div>
+      ))}
+    </Section>
+
+    {/* ── Authorization Letters ── */}
+    <Section title="Matrix Legal — Authorization Letters" defaultOpen={false}>
+      <p className="text-xs text-muted-foreground mb-3">These fields populate the Matrix Legal authorization and direction letters.</p>
+      <G2>
+        <F label="To (Insurance Company / Recipient)" k="authTo" f={f} set={set} af={af} />
+        <F label="RE (Client name / reference)" k="authRE" f={f} set={set} af={af} />
+        <F label="Client Full Name (for authorization)" k="authClientName" f={f} set={set} af={af} />
+        <F label="Health Card No. (for OHIP authorization)" k="authHealthCardNo" f={f} set={set} af={af} />
+        <F label="Dated at (city)" k="authDatedAt" f={f} set={set} af={af} />
+        <F label="Day" k="authDay" f={f} set={set} af={af} />
+        <F label="Month" k="authMonth" f={f} set={set} af={af} />
+        <F label="Year" k="authYear" f={f} set={set} af={af} />
+        <F label="Witness Name" k="authWitness" f={f} set={set} af={af} />
+      </G2>
+    </Section>
+
+    {/* ── Contingency Fee Retainer ── */}
+    <Section title="Contingency Fee Retainer Agreement" defaultOpen={false}>
+      <p className="text-xs text-muted-foreground mb-3">Matrix Legal Services Professional Corporation — 2190 Warden Avenue, Suite 202, Scarborough, Ontario M1T 1V6 — Tel: 416-494-3857</p>
+      <G2>
+        <F label="Client Full Name" k="retainerClientName" f={f} set={set} af={af} />
+        <F label="Day of accident" k="retainerAccidentDay" f={f} set={set} af={af} />
+        <F label="Month of accident" k="retainerAccidentMonth" f={f} set={set} af={af} />
+        <F label="Year of accident" k="retainerAccidentYear" f={f} set={set} af={af} />
+        <F label="Location of accident (city)" k="retainerAccidentCity" f={f} set={set} af={af} />
+        <F label="Contingency Fee Percentage (%)" k="retainerFeePercent" f={f} set={set} af={af} />
+        <F label="Dated at (city)" k="retainerDatedAt" f={f} set={set} af={af} />
+        <F label="Day signed" k="retainerSignDay" f={f} set={set} af={af} />
+        <F label="Month signed" k="retainerSignMonth" f={f} set={set} af={af} />
+        <F label="Year signed" k="retainerSignYear" f={f} set={set} af={af} />
+        <F label="Client Phone No." k="retainerClientPhone" f={f} set={set} af={af} />
+      </G2>
+      <F label="Print Client's Name" k="retainerClientPrintName" f={f} set={set} af={af} />
+    </Section>
+  </>);
+}
+
 // ── Map template ID → form component ─────────────────────────────────────────
 const FORM_MAP: Record<string, any> = {
   "ocf-1":  OCF1Form,
@@ -886,6 +1388,7 @@ const FORM_MAP: Record<string, any> = {
   "ocf-18": OCF18Form,
   "ocf-19": OCF19Form,
   "ocf-23": OCF23Form,
+  "matrix-intake": MatrixIntakeForm,
 };
 
 // ── PDF generation using jsPDF ────────────────────────────────────────────────
@@ -1000,7 +1503,7 @@ async function exportToPDF(fields: Record<string,any>, templateName: string) {
   for (let i = 1; i <= totalPages; i++) {
     doc.setPage(i);
     doc.setFontSize(7); doc.setFont("helvetica","normal");
-    doc.text(`© Padak (Pvt) Ltd. Printer for Ontario — ${templateName} — Page ${i} of ${totalPages}`, pageW/2, pageH-10, {align:"center"});
+    doc.text(`© King's Printer for Ontario — ${templateName} — Page ${i} of ${totalPages}`, pageW/2, pageH-10, {align:"center"});
     doc.text(`Generated: ${new Date().toLocaleDateString("en-CA")}`, pageW-margin, pageH-10, {align:"right"});
   }
 
