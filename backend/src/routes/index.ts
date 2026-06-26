@@ -28,7 +28,21 @@ import {
 } from '../controllers/misc.controller';
 import { getOcfFormData, saveOcfFormData, getOcfPrefill } from '../controllers/ocf.controller';
 
+import {
+  listEditorDocuments,
+  getEditorDocument,
+  createEditorDocument,
+  updateEditorDocument,
+  deleteEditorDocument,
+} from "../controllers/editor-documents.controller";
+
 const router = Router();
+
+router.get   ("/editor-documents",     authenticate, listEditorDocuments);
+router.get   ("/editor-documents/:id", authenticate, getEditorDocument);
+router.post  ("/editor-documents",     authenticate, createEditorDocument);
+router.put   ("/editor-documents/:id", authenticate, updateEditorDocument);
+router.delete("/editor-documents/:id", authenticate, deleteEditorDocument);
 
 // Public
 router.post('/auth/login', login);
