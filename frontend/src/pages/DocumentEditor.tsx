@@ -8,10 +8,11 @@ import {
   AlignLeft, AlignCenter, AlignRight, List, ListOrdered,
   Undo, Redo, Table, Link, Code, Image, Indent, Outdent,
   Loader2, Cloud, CloudOff,
-  FolderOpen, Plus, Clock, ChevronLeft,
+  FolderOpen, Plus, Clock, ChevronLeft, Trash2,
 } from "lucide-react";
 import { API_BASE_URL } from "@/lib/constants";
 import { AppSidebar } from "@/components/layout/AppSidebar";
+import { useAuth } from "@/lib/auth";
 
 // ── Auth helper ───────────────────────────────────────────────────────────────
 function getToken() {
@@ -124,6 +125,18 @@ const TOOLBAR_GROUPS = [
 export default function DocumentEditor() {
   const navigate       = useNavigate();
   const { toast }      = useToast();
+  const { user }       = useAuth();
+
+  // Admin check — same pattern as Settings.tsx
+  const isAdmin = (() => {
+    if (!user) return false;
+    const role = (user as any).display_role || (user as any).displayRole || "";
+    if (role === "Admin") return true;
+    try {
+      const raw = JSON.parse(localStorage.getItem("crm_user") || "{}");
+      return (raw?.display_role || raw?.displayRole || "") === "Admin";
+    } catch { return false; }
+  })();
   const [searchParams] = useSearchParams();
 
   // URL params:  ?id=<docId>  and/or  ?caseId=<caseId>
@@ -201,6 +214,30 @@ export default function DocumentEditor() {
     setHasUnsaved(false);
     setShowDocList(false);
     window.history.replaceState(null, "", "/document-editor");
+  };
+
+  // ── Delete a saved document (Admin only) ─────────────────────────────────
+  const handleDeleteDoc = async (e: React.MouseEvent, doc: any) => {
+    e.stopPropagation(); // prevent opening the doc
+    if (!confirm(`Delete "${doc.title || "Untitled Document"}"? This cannot be undone.`)) return;
+    try {
+      const res = await fetch(`${API_BASE_URL}/editor-documents/${doc.id}`, {
+        method: "DELETE",
+        headers: { Authorization: `Bearer ${getToken()}` },
+      });
+      if (!res.ok) {
+        const body = await res.json().catch(() => ({}));
+        throw new Error(body.error || `HTTP ${res.status}`);
+      }
+      // If the deleted doc is currently open, clear the editor
+      if (docId === doc.id) {
+        newDoc();
+      }
+      setDocList(prev => prev.filter(d => d.id !== doc.id));
+      toast({ title: "Document deleted" });
+    } catch (err: any) {
+      toast({ title: "Delete failed", description: err.message, variant: "destructive" });
+    }
   };
 
   const editorRef    = useRef<HTMLDivElement>(null);
@@ -647,12 +684,12 @@ export default function DocumentEditor() {
                 ) : (
                   <ul className="divide-y">
                     {docList.map((doc: any) => (
-                      <li key={doc.id}>
+                      <li key={doc.id} className="relative group/item">
                         <button
                           onClick={() => openDoc(doc)}
-                          className={`w-full text-left px-3 py-2.5 hover:bg-muted/50 transition-colors group ${docId === doc.id ? "bg-primary/5 border-l-2 border-primary" : ""}`}
+                          className={`w-full text-left px-3 py-2.5 hover:bg-muted/50 transition-colors ${docId === doc.id ? "bg-primary/5 border-l-2 border-primary" : ""}`}
                         >
-                          <div className="flex items-start gap-2">
+                          <div className="flex items-start gap-2 pr-6">
                             <FileText className={`h-3.5 w-3.5 mt-0.5 shrink-0 ${docId === doc.id ? "text-primary" : "text-muted-foreground"}`} />
                             <div className="min-w-0 flex-1">
                               <p className={`text-xs font-medium truncate ${docId === doc.id ? "text-primary" : "text-foreground"}`}>
@@ -675,6 +712,16 @@ export default function DocumentEditor() {
                             </div>
                           </div>
                         </button>
+                        {/* Delete button — Admin only, appears on hover */}
+                        {isAdmin && (
+                          <button
+                            onClick={(e) => handleDeleteDoc(e, doc)}
+                            title="Delete document"
+                            className="absolute right-2 top-1/2 -translate-y-1/2 h-6 w-6 flex items-center justify-center rounded opacity-0 group-hover/item:opacity-100 transition-opacity hover:bg-destructive/10 text-muted-foreground hover:text-destructive"
+                          >
+                            <Trash2 className="h-3 w-3" />
+                          </button>
+                        )}
                       </li>
                     ))}
                   </ul>
