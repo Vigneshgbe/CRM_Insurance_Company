@@ -8,39 +8,45 @@ import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Trash2, Plus } from "lucide-react";
+import { Trash2, Plus, UserCheck, UserX, AlertTriangle } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { usersApi } from "@/lib/api";
 import { useToast } from "@/hooks/use-toast";
+import { useAuth } from "@/lib/auth";
 import { API_BASE_URL } from "@/lib/constants";
 
 function getToken() {
   return localStorage.getItem("crm_token") || localStorage.getItem("token") || "";
 }
 
-// ── Tabs — Templates and Lookup Values removed ────────────────────────────────
-const TABS = ["Users", "System"];
-
-// ── Helper: MySQL returns tinyint 1/0, not boolean true/false ─────────────────
+// ── MySQL TINYINT 0/1 → boolean ────────────────────────────────────────────────
 function isActive(val: any): boolean {
-  if (val === true  || val === 1  || val === "1")  return true;
-  if (val === false || val === 0  || val === "0")  return false;
-  return true; // default to active if unknown
+  if (val === true  || val === 1 || val === "1") return true;
+  if (val === false || val === 0 || val === "0") return false;
+  return true;
 }
+
+// ── Tabs ──────────────────────────────────────────────────────────────────────
+const TABS = ["Users", "System"];
 
 export default function Settings() {
   const { toast } = useToast();
+  const { user: currentUser } = useAuth();
   const [activeTab, setActiveTab] = useState("Users");
 
-  // ── Users state ────────────────────────────────────────────────────────────
+  // Is the logged-in user an Admin?
+  const isAdmin = currentUser?.display_role === "Admin" ||
+                  (currentUser as any)?.displayRole === "Admin";
+
+  // ── Users state ─────────────────────────────────────────────────────────────
   const [users, setUsers] = useState<any[]>([]);
   const [loadingUsers, setLoadingUsers] = useState(true);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [form, setForm] = useState({ name: "", email: "", password: "", displayRole: "Staff" });
   const [saving, setSaving] = useState(false);
-  const [deletingId, setDeletingId] = useState<string | null>(null);
+  const [busyId, setBusyId] = useState<string | null>(null);
 
-  // ── System settings state ──────────────────────────────────────────────────
+  // ── System settings state ────────────────────────────────────────────────────
   const [systemSettings, setSystemSettings] = useState({
     appName: "",
     companyName: "",
@@ -52,7 +58,7 @@ export default function Settings() {
   const [loadingSystem, setLoadingSystem] = useState(true);
   const [savingSystem, setSavingSystem] = useState(false);
 
-  // ── Load on tab switch ─────────────────────────────────────────────────────
+  // ── Load on tab switch ───────────────────────────────────────────────────────
   useEffect(() => {
     if (activeTab === "Users")  loadUsers();
     if (activeTab === "System") loadSystemSettings();
@@ -93,31 +99,68 @@ export default function Settings() {
     }
   }
 
-  async function handleDeleteUser(id: string, name: string) {
-    if (!confirm(`Deactivate "${name}"? They will no longer be able to log in.`)) return;
-    setDeletingId(id);
+  // ── Generic user action via direct fetch ─────────────────────────────────────
+  async function userAction(
+    id: string,
+    name: string,
+    endpoint: string,
+    method: string,
+    confirmMsg: string,
+    successMsg: string,
+    localUpdate: (prev: any[]) => any[],
+  ) {
+    if (!confirm(confirmMsg)) return;
+    setBusyId(id);
     try {
-      // Direct fetch so we can see the actual error response
-      const res = await fetch(`${API_BASE_URL}/users/${id}`, {
-        method: "DELETE",
+      const res = await fetch(`${API_BASE_URL}${endpoint}`, {
+        method,
         headers: { Authorization: `Bearer ${getToken()}` },
       });
       if (!res.ok) {
         const body = await res.json().catch(() => ({}));
         throw new Error(body.error || `HTTP ${res.status}`);
       }
-      toast({ title: "User deactivated", description: `${name} has been deactivated.` });
-      // Update local state immediately — no need for a full reload
-      setUsers(prev => prev.map(u => u.id === id ? { ...u, is_active: 0 } : u));
+      toast({ title: successMsg });
+      setUsers(prev => localUpdate(prev));
     } catch (err: any) {
-      console.error("Delete user error:", err);
-      toast({ title: "Failed to deactivate user", description: err.message, variant: "destructive" });
+      console.error(`[${method} ${endpoint}]`, err);
+      toast({ title: "Action failed", description: err.message, variant: "destructive" });
     } finally {
-      setDeletingId(null);
+      setBusyId(null);
     }
   }
 
-  // ── System settings — persisted to localStorage ───────────────────────────
+  const handleDeactivate = (id: string, name: string) =>
+    userAction(
+      id, name,
+      `/users/${id}`,
+      "DELETE",
+      `Deactivate "${name}"? They will no longer be able to log in.`,
+      `${name} deactivated.`,
+      prev => prev.map(u => u.id === id ? { ...u, is_active: 0 } : u),
+    );
+
+  const handleReactivate = (id: string, name: string) =>
+    userAction(
+      id, name,
+      `/users/${id}/reactivate`,
+      "PUT",
+      `Reactivate "${name}"? They will be able to log in again.`,
+      `${name} reactivated.`,
+      prev => prev.map(u => u.id === id ? { ...u, is_active: 1 } : u),
+    );
+
+  const handleHardDelete = (id: string, name: string) =>
+    userAction(
+      id, name,
+      `/users/${id}/permanent`,
+      "DELETE",
+      `⚠️ PERMANENTLY DELETE "${name}"?\n\nThis cannot be undone. All their data references will remain but this login account will be gone forever.`,
+      `${name} permanently deleted.`,
+      prev => prev.filter(u => u.id !== id),
+    );
+
+  // ── System settings — persisted to localStorage ──────────────────────────────
   function loadSystemSettings() {
     setLoadingSystem(true);
     try {
@@ -135,7 +178,7 @@ export default function Settings() {
         });
       }
     } catch {
-      // Keep defaults on parse error
+      // keep defaults
     } finally {
       setLoadingSystem(false);
     }
@@ -145,7 +188,7 @@ export default function Settings() {
     setSavingSystem(true);
     try {
       localStorage.setItem("crm_system_settings", JSON.stringify(systemSettings));
-      // Dispatch a storage event so AppSidebar re-reads the app name immediately
+      // Notify AppSidebar in the same tab
       window.dispatchEvent(new StorageEvent("storage", {
         key: "crm_system_settings",
         newValue: JSON.stringify(systemSettings),
@@ -180,146 +223,209 @@ export default function Settings() {
 
       {/* ── Users Tab ─────────────────────────────────────────────────────── */}
       {activeTab === "Users" && (
-        <Card>
-          <CardHeader className="pb-3 flex flex-row items-center justify-between">
-            <CardTitle className="text-base">System Users</CardTitle>
-            <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
-              <DialogTrigger asChild>
-                <Button size="sm">
-                  <Plus className="h-4 w-4 mr-1" /> Add User
-                </Button>
-              </DialogTrigger>
-              <DialogContent aria-describedby={undefined}>
-                <DialogHeader><DialogTitle>Add New User</DialogTitle></DialogHeader>
-                <div className="space-y-3 pt-2">
-                  <div>
-                    <Label>Full Name</Label>
-                    <Input
-                      value={form.name}
-                      onChange={(e) => setForm({ ...form, name: e.target.value })}
-                      placeholder="Full name"
-                      className="mt-1"
-                    />
+        <div className="space-y-3">
+          {!isAdmin && (
+            <div className="flex items-center gap-2 text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded-md px-3 py-2">
+              <AlertTriangle className="h-3.5 w-3.5 shrink-0" />
+              Reactivate and permanent delete actions are restricted to Admin users.
+            </div>
+          )}
+
+          <Card>
+            <CardHeader className="pb-3 flex flex-row items-center justify-between">
+              <CardTitle className="text-base">System Users</CardTitle>
+              <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
+                <DialogTrigger asChild>
+                  <Button size="sm">
+                    <Plus className="h-4 w-4 mr-1" /> Add User
+                  </Button>
+                </DialogTrigger>
+                <DialogContent aria-describedby={undefined}>
+                  <DialogHeader><DialogTitle>Add New User</DialogTitle></DialogHeader>
+                  <div className="space-y-3 pt-2">
+                    <div>
+                      <Label>Full Name</Label>
+                      <Input
+                        value={form.name}
+                        onChange={(e) => setForm({ ...form, name: e.target.value })}
+                        placeholder="Full name"
+                        className="mt-1"
+                      />
+                    </div>
+                    <div>
+                      <Label>Email</Label>
+                      <Input
+                        type="email"
+                        value={form.email}
+                        onChange={(e) => setForm({ ...form, email: e.target.value })}
+                        placeholder="email@example.com"
+                        className="mt-1"
+                      />
+                    </div>
+                    <div>
+                      <Label>Password</Label>
+                      <Input
+                        type="password"
+                        value={form.password}
+                        onChange={(e) => setForm({ ...form, password: e.target.value })}
+                        placeholder="Minimum 8 characters"
+                        className="mt-1"
+                      />
+                    </div>
+                    <div>
+                      <Label>Role</Label>
+                      <Select
+                        value={form.displayRole}
+                        onValueChange={(v) => setForm({ ...form, displayRole: v })}
+                      >
+                        <SelectTrigger className="mt-1"><SelectValue /></SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="Admin">Admin</SelectItem>
+                          <SelectItem value="Manager">Manager</SelectItem>
+                          <SelectItem value="Staff">Staff</SelectItem>
+                          <SelectItem value="Client">Client</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div className="flex justify-end gap-2 pt-2">
+                      <Button variant="outline" onClick={() => setDialogOpen(false)}>Cancel</Button>
+                      <Button onClick={handleAddUser} disabled={saving}>
+                        {saving ? "Adding..." : "Add User"}
+                      </Button>
+                    </div>
                   </div>
-                  <div>
-                    <Label>Email</Label>
-                    <Input
-                      type="email"
-                      value={form.email}
-                      onChange={(e) => setForm({ ...form, email: e.target.value })}
-                      placeholder="email@example.com"
-                      className="mt-1"
-                    />
-                  </div>
-                  <div>
-                    <Label>Password</Label>
-                    <Input
-                      type="password"
-                      value={form.password}
-                      onChange={(e) => setForm({ ...form, password: e.target.value })}
-                      placeholder="Minimum 8 characters"
-                      className="mt-1"
-                    />
-                  </div>
-                  <div>
-                    <Label>Role</Label>
-                    <Select
-                      value={form.displayRole}
-                      onValueChange={(v) => setForm({ ...form, displayRole: v })}
-                    >
-                      <SelectTrigger className="mt-1"><SelectValue /></SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="Admin">Admin</SelectItem>
-                        <SelectItem value="Manager">Manager</SelectItem>
-                        <SelectItem value="Staff">Staff</SelectItem>
-                        <SelectItem value="Client">Client</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-                  <div className="flex justify-end gap-2 pt-2">
-                    <Button variant="outline" onClick={() => setDialogOpen(false)}>Cancel</Button>
-                    <Button onClick={handleAddUser} disabled={saving}>
-                      {saving ? "Adding..." : "Add User"}
-                    </Button>
-                  </div>
-                </div>
-              </DialogContent>
-            </Dialog>
-          </CardHeader>
-          <CardContent className="p-0">
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead className="text-xs">Name</TableHead>
-                  <TableHead className="text-xs">Email</TableHead>
-                  <TableHead className="text-xs">Role</TableHead>
-                  <TableHead className="text-xs">Status</TableHead>
-                  <TableHead className="text-xs w-20">Action</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {loadingUsers ? (
+                </DialogContent>
+              </Dialog>
+            </CardHeader>
+
+            <CardContent className="p-0">
+              <Table>
+                <TableHeader>
                   <TableRow>
-                    <TableCell colSpan={5} className="text-center text-muted-foreground py-6">
-                      Loading users...
-                    </TableCell>
+                    <TableHead className="text-xs pl-4">Name</TableHead>
+                    <TableHead className="text-xs">Email</TableHead>
+                    <TableHead className="text-xs">Role</TableHead>
+                    <TableHead className="text-xs">Status</TableHead>
+                    <TableHead className="text-xs">Actions</TableHead>
                   </TableRow>
-                ) : users.length === 0 ? (
-                  <TableRow>
-                    <TableCell colSpan={5} className="text-center text-muted-foreground py-6">
-                      No users found.
-                    </TableCell>
-                  </TableRow>
-                ) : (
-                  users.map((u: any) => {
-                    const active = isActive(u.is_active);
-                    const isDeleting = deletingId === u.id;
-                    return (
-                      <TableRow key={u.id} className={!active ? "opacity-50" : ""}>
-                        <TableCell className="py-2 font-medium">{u.name}</TableCell>
-                        <TableCell className="py-2 text-muted-foreground text-xs">{u.email}</TableCell>
-                        <TableCell className="py-2">
-                          <Badge variant="secondary" className="text-xs">
-                            {u.display_role || u.displayRole || u.role}
-                          </Badge>
-                        </TableCell>
-                        <TableCell className="py-2">
-                          <Badge
-                            variant="outline"
-                            className={cn(
-                              "text-xs",
-                              active
-                                ? "bg-green-50 text-green-700 border-green-200"
-                                : "bg-muted text-muted-foreground border-muted-foreground/30"
+                </TableHeader>
+                <TableBody>
+                  {loadingUsers ? (
+                    <TableRow>
+                      <TableCell colSpan={5} className="text-center text-muted-foreground py-8">
+                        Loading users...
+                      </TableCell>
+                    </TableRow>
+                  ) : users.length === 0 ? (
+                    <TableRow>
+                      <TableCell colSpan={5} className="text-center text-muted-foreground py-8">
+                        No users found.
+                      </TableCell>
+                    </TableRow>
+                  ) : (
+                    users.map((u: any) => {
+                      const active   = isActive(u.is_active);
+                      const isSelf   = currentUser?.id === u.id;
+                      const isBusy   = busyId === u.id;
+
+                      return (
+                        <TableRow
+                          key={u.id}
+                          className={cn(!active && "bg-muted/30 opacity-60")}
+                        >
+                          <TableCell className="py-2 font-medium pl-4">
+                            {u.name}
+                            {isSelf && (
+                              <span className="ml-1.5 text-[10px] text-muted-foreground">(you)</span>
                             )}
-                          >
-                            {active ? "Active" : "Inactive"}
-                          </Badge>
-                        </TableCell>
-                        <TableCell className="py-2">
-                          {active ? (
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              className="h-7 px-2 text-xs text-muted-foreground hover:text-destructive hover:bg-destructive/10"
-                              onClick={() => handleDeleteUser(u.id, u.name)}
-                              disabled={isDeleting}
+                          </TableCell>
+                          <TableCell className="py-2 text-muted-foreground text-xs">{u.email}</TableCell>
+                          <TableCell className="py-2">
+                            <Badge variant="secondary" className="text-xs">
+                              {u.display_role || u.displayRole || u.role}
+                            </Badge>
+                          </TableCell>
+                          <TableCell className="py-2">
+                            <Badge
+                              variant="outline"
+                              className={cn(
+                                "text-xs",
+                                active
+                                  ? "bg-green-50 text-green-700 border-green-200"
+                                  : "bg-red-50 text-red-600 border-red-200"
+                              )}
                             >
-                              <Trash2 className="h-3.5 w-3.5 mr-1" />
-                              {isDeleting ? "..." : "Deactivate"}
-                            </Button>
-                          ) : (
-                            <span className="text-xs text-muted-foreground px-2">Inactive</span>
-                          )}
-                        </TableCell>
-                      </TableRow>
-                    );
-                  })
-                )}
-              </TableBody>
-            </Table>
-          </CardContent>
-        </Card>
+                              {active ? "Active" : "Inactive"}
+                            </Badge>
+                          </TableCell>
+                          <TableCell className="py-2">
+                            {isSelf ? (
+                              <span className="text-xs text-muted-foreground px-1">—</span>
+                            ) : (
+                              <div className="flex items-center gap-1">
+                                {/* Deactivate — available to all roles for active users */}
+                                {active && (
+                                  <Button
+                                    variant="ghost"
+                                    size="sm"
+                                    className="h-7 px-2 text-xs text-amber-700 hover:text-amber-800 hover:bg-amber-50"
+                                    onClick={() => handleDeactivate(u.id, u.name)}
+                                    disabled={isBusy}
+                                    title="Deactivate user"
+                                  >
+                                    <UserX className="h-3.5 w-3.5 mr-1" />
+                                    {isBusy ? "..." : "Deactivate"}
+                                  </Button>
+                                )}
+
+                                {/* Reactivate — Admin only, inactive users */}
+                                {!active && isAdmin && (
+                                  <Button
+                                    variant="ghost"
+                                    size="sm"
+                                    className="h-7 px-2 text-xs text-green-700 hover:text-green-800 hover:bg-green-50"
+                                    onClick={() => handleReactivate(u.id, u.name)}
+                                    disabled={isBusy}
+                                    title="Reactivate user"
+                                  >
+                                    <UserCheck className="h-3.5 w-3.5 mr-1" />
+                                    {isBusy ? "..." : "Reactivate"}
+                                  </Button>
+                                )}
+
+                                {/* Permanent delete — Admin only, inactive users only */}
+                                {!active && isAdmin && (
+                                  <Button
+                                    variant="ghost"
+                                    size="sm"
+                                    className="h-7 px-2 text-xs text-destructive hover:text-destructive hover:bg-destructive/10"
+                                    onClick={() => handleHardDelete(u.id, u.name)}
+                                    disabled={isBusy}
+                                    title="Permanently delete user"
+                                  >
+                                    <Trash2 className="h-3.5 w-3.5 mr-1" />
+                                    Delete
+                                  </Button>
+                                )}
+
+                                {/* Non-admin sees inactive but no actions */}
+                                {!active && !isAdmin && (
+                                  <span className="text-xs text-muted-foreground px-1">
+                                    Inactive
+                                  </span>
+                                )}
+                              </div>
+                            )}
+                          </TableCell>
+                        </TableRow>
+                      );
+                    })
+                  )}
+                </TableBody>
+              </Table>
+            </CardContent>
+          </Card>
+        </div>
       )}
 
       {/* ── System Tab ────────────────────────────────────────────────────── */}
