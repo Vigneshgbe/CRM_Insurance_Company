@@ -25,8 +25,8 @@ import {
   getUsers, createUser, deleteUser,
   getStatusSummary, getMonthlyStats, getLimitationAlerts, getSettlementsSummary,
   getPortalCases, getPortalDocuments, getPortalStatusHistory,
-  getOcfFormData, saveOcfFormData, getOcfPrefill
 } from '../controllers/misc.controller';
+import { getOcfFormData, saveOcfFormData, getOcfPrefill } from '../controllers/ocf.controller';
 
 const router = Router();
 
