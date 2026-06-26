@@ -1,3 +1,4 @@
+import { useState, useEffect } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import {
   LayoutDashboard, Users, FolderOpen, FileText, FileTextIcon,
@@ -27,10 +28,36 @@ function getRoleLabel(user: any): string {
   return user.role || "";
 }
 
+// Read app name from localStorage (set by Settings page)
+function readAppName(): string {
+  try {
+    const stored = localStorage.getItem("crm_system_settings");
+    if (stored) {
+      const parsed = JSON.parse(stored);
+      if (parsed.appName) return parsed.appName;
+    }
+  } catch { /* ignore */ }
+  return "Hypernova CRM";
+}
+
 export function AppSidebar() {
   const location = useLocation();
   const navigate  = useNavigate();
   const { user, logout } = useAuth();
+
+  // ── Reactive app name — updates immediately when Settings saves ───────────
+  const [appName, setAppName] = useState<string>(readAppName);
+
+  useEffect(() => {
+    // Listen for storage events dispatched by Settings.tsx when saved
+    function onStorage(e: StorageEvent) {
+      if (e.key === "crm_system_settings") {
+        setAppName(readAppName());
+      }
+    }
+    window.addEventListener("storage", onStorage);
+    return () => window.removeEventListener("storage", onStorage);
+  }, []);
 
   const handleLogout = () => {
     logout();
@@ -43,9 +70,9 @@ export function AppSidebar() {
 
   return (
     <aside className="hidden md:flex flex-col w-60 min-h-screen bg-sidebar text-sidebar-foreground fixed left-0 top-0 z-30">
-      {/* Logo */}
+      {/* Logo — shows saved app name from System Settings */}
       <div className="h-14 flex items-center px-5 border-b border-sidebar-muted">
-        <span className="text-lg font-bold tracking-tight">Padak's CRM</span>
+        <span className="text-lg font-bold tracking-tight truncate">{appName}</span>
       </div>
 
       {/* Navigation */}

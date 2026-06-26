@@ -21,6 +21,13 @@ function getToken() {
 // ── Tabs — Templates and Lookup Values removed ────────────────────────────────
 const TABS = ["Users", "System"];
 
+// ── Helper: MySQL returns tinyint 1/0, not boolean true/false ─────────────────
+function isActive(val: any): boolean {
+  if (val === true  || val === 1  || val === "1")  return true;
+  if (val === false || val === 0  || val === "0")  return false;
+  return true; // default to active if unknown
+}
+
 export default function Settings() {
   const { toast } = useToast();
   const [activeTab, setActiveTab] = useState("Users");
@@ -31,6 +38,7 @@ export default function Settings() {
   const [dialogOpen, setDialogOpen] = useState(false);
   const [form, setForm] = useState({ name: "", email: "", password: "", displayRole: "Staff" });
   const [saving, setSaving] = useState(false);
+  const [deletingId, setDeletingId] = useState<string | null>(null);
 
   // ── System settings state ──────────────────────────────────────────────────
   const [systemSettings, setSystemSettings] = useState({
@@ -44,18 +52,20 @@ export default function Settings() {
   const [loadingSystem, setLoadingSystem] = useState(true);
   const [savingSystem, setSavingSystem] = useState(false);
 
-  // ── Load users ─────────────────────────────────────────────────────────────
+  // ── Load on tab switch ─────────────────────────────────────────────────────
   useEffect(() => {
-    if (activeTab === "Users") loadUsers();
+    if (activeTab === "Users")  loadUsers();
     if (activeTab === "System") loadSystemSettings();
   }, [activeTab]);
 
   async function loadUsers() {
     setLoadingUsers(true);
     try {
-      setUsers(await usersApi.getAll());
+      const data = await usersApi.getAll();
+      setUsers(Array.isArray(data) ? data : []);
     } catch (err) {
-      console.error(err);
+      console.error("Failed to load users:", err);
+      toast({ title: "Failed to load users", variant: "destructive" });
     } finally {
       setLoadingUsers(false);
     }
@@ -83,20 +93,31 @@ export default function Settings() {
     }
   }
 
-  async function handleDeleteUser(id: string) {
-    if (!confirm("Deactivate this user?")) return;
+  async function handleDeleteUser(id: string, name: string) {
+    if (!confirm(`Deactivate "${name}"? They will no longer be able to log in.`)) return;
+    setDeletingId(id);
     try {
-      await usersApi.delete(id);
-      toast({ title: "User deactivated" });
-      loadUsers();
-    } catch {
-      toast({ title: "Failed to deactivate user", variant: "destructive" });
+      // Direct fetch so we can see the actual error response
+      const res = await fetch(`${API_BASE_URL}/users/${id}`, {
+        method: "DELETE",
+        headers: { Authorization: `Bearer ${getToken()}` },
+      });
+      if (!res.ok) {
+        const body = await res.json().catch(() => ({}));
+        throw new Error(body.error || `HTTP ${res.status}`);
+      }
+      toast({ title: "User deactivated", description: `${name} has been deactivated.` });
+      // Update local state immediately — no need for a full reload
+      setUsers(prev => prev.map(u => u.id === id ? { ...u, is_active: 0 } : u));
+    } catch (err: any) {
+      console.error("Delete user error:", err);
+      toast({ title: "Failed to deactivate user", description: err.message, variant: "destructive" });
+    } finally {
+      setDeletingId(null);
     }
   }
 
-  // ── System settings — stored in localStorage as simple key-value ──────────
-  // A full backend settings table is a future task; for now we persist to
-  // localStorage so values survive refresh without extra DB work.
+  // ── System settings — persisted to localStorage ───────────────────────────
   function loadSystemSettings() {
     setLoadingSystem(true);
     try {
@@ -104,7 +125,6 @@ export default function Settings() {
       if (stored) {
         setSystemSettings(JSON.parse(stored));
       } else {
-        // Default values
         setSystemSettings({
           appName:     "Hypernova CRM",
           companyName: "Matrix Legal Services",
@@ -124,9 +144,13 @@ export default function Settings() {
   async function handleSaveSystem() {
     setSavingSystem(true);
     try {
-      // Persist to localStorage
       localStorage.setItem("crm_system_settings", JSON.stringify(systemSettings));
-      toast({ title: "Settings saved" });
+      // Dispatch a storage event so AppSidebar re-reads the app name immediately
+      window.dispatchEvent(new StorageEvent("storage", {
+        key: "crm_system_settings",
+        newValue: JSON.stringify(systemSettings),
+      }));
+      toast({ title: "Settings saved", description: "Sidebar app name updated." });
     } catch {
       toast({ title: "Failed to save settings", variant: "destructive" });
     } finally {
@@ -136,7 +160,7 @@ export default function Settings() {
 
   return (
     <AppLayout title="Settings">
-      {/* Tab bar — only Users and System */}
+      {/* Tab bar */}
       <div className="flex gap-1 border-b mb-6">
         {TABS.map((tab) => (
           <button
@@ -230,7 +254,7 @@ export default function Settings() {
                   <TableHead className="text-xs">Email</TableHead>
                   <TableHead className="text-xs">Role</TableHead>
                   <TableHead className="text-xs">Status</TableHead>
-                  <TableHead className="text-xs w-10"></TableHead>
+                  <TableHead className="text-xs w-20">Action</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -247,40 +271,50 @@ export default function Settings() {
                     </TableCell>
                   </TableRow>
                 ) : (
-                  users.map((u: any) => (
-                    <TableRow key={u.id}>
-                      <TableCell className="py-2 font-medium">{u.name}</TableCell>
-                      <TableCell className="py-2 text-muted-foreground">{u.email}</TableCell>
-                      <TableCell className="py-2">
-                        <Badge variant="secondary" className="text-xs">
-                          {u.display_role || u.displayRole || u.role}
-                        </Badge>
-                      </TableCell>
-                      <TableCell className="py-2">
-                        <Badge
-                          className={cn(
-                            "text-xs",
-                            u.is_active !== false
-                              ? "bg-success/20 text-success border-success/30"
-                              : "bg-muted text-muted-foreground"
+                  users.map((u: any) => {
+                    const active = isActive(u.is_active);
+                    const isDeleting = deletingId === u.id;
+                    return (
+                      <TableRow key={u.id} className={!active ? "opacity-50" : ""}>
+                        <TableCell className="py-2 font-medium">{u.name}</TableCell>
+                        <TableCell className="py-2 text-muted-foreground text-xs">{u.email}</TableCell>
+                        <TableCell className="py-2">
+                          <Badge variant="secondary" className="text-xs">
+                            {u.display_role || u.displayRole || u.role}
+                          </Badge>
+                        </TableCell>
+                        <TableCell className="py-2">
+                          <Badge
+                            variant="outline"
+                            className={cn(
+                              "text-xs",
+                              active
+                                ? "bg-green-50 text-green-700 border-green-200"
+                                : "bg-muted text-muted-foreground border-muted-foreground/30"
+                            )}
+                          >
+                            {active ? "Active" : "Inactive"}
+                          </Badge>
+                        </TableCell>
+                        <TableCell className="py-2">
+                          {active ? (
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              className="h-7 px-2 text-xs text-muted-foreground hover:text-destructive hover:bg-destructive/10"
+                              onClick={() => handleDeleteUser(u.id, u.name)}
+                              disabled={isDeleting}
+                            >
+                              <Trash2 className="h-3.5 w-3.5 mr-1" />
+                              {isDeleting ? "..." : "Deactivate"}
+                            </Button>
+                          ) : (
+                            <span className="text-xs text-muted-foreground px-2">Inactive</span>
                           )}
-                          variant="outline"
-                        >
-                          {u.is_active !== false ? "Active" : "Inactive"}
-                        </Badge>
-                      </TableCell>
-                      <TableCell className="py-2">
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          className="h-7 w-7 text-muted-foreground hover:text-destructive"
-                          onClick={() => handleDeleteUser(u.id)}
-                        >
-                          <Trash2 className="h-3.5 w-3.5" />
-                        </Button>
-                      </TableCell>
-                    </TableRow>
-                  ))
+                        </TableCell>
+                      </TableRow>
+                    );
+                  })
                 )}
               </TableBody>
             </Table>
@@ -301,6 +335,7 @@ export default function Settings() {
               <div className="space-y-4 max-w-md">
                 <div>
                   <Label className="text-xs">Application Name</Label>
+                  <p className="text-xs text-muted-foreground mb-1">Displayed in the sidebar navigation.</p>
                   <Input
                     value={systemSettings.appName}
                     onChange={(e) => setSystemSettings({ ...systemSettings, appName: e.target.value })}
