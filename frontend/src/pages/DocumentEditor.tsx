@@ -146,11 +146,16 @@ export default function DocumentEditor() {
     fetch(`${API_BASE_URL}/editor-documents`, {
       headers: { Authorization: `Bearer ${getToken()}` },
     })
-      .then(r => r.ok ? r.json() : [])
+      .then(r => {
+        if (!r.ok) return r.json().then(e => Promise.reject(e.error || `HTTP ${r.status}`));
+        return r.json();
+      })
       .then(data => setDocList(Array.isArray(data) ? data : []))
-      .catch(() => {/* silently ignore */})
+      .catch((err) => {
+        toast({ title: "Failed to load documents", description: String(err), variant: "destructive" });
+      })
       .finally(() => setDocListLoading(false));
-  }, []);
+  }, [toast]);
 
   // Load doc list whenever panel opens
   useEffect(() => {
