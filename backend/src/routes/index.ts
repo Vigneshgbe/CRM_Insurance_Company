@@ -21,6 +21,7 @@ import { getLawyers, saveLawyers } from '../controllers/lawyers.controller';
 import { getSpecialist, saveSpecialist } from '../controllers/specialist.controller';
 import { getClientInfo, saveClientInfo } from '../controllers/client-info.controller';
 import { getInitialInterview, saveInitialInterview } from '../controllers/initial-interview.controller';
+import { getAccidentDetails, saveAccidentDetails } from '../controllers/accident-details.controller';
 import {
   getUsers, createUser, deleteUser, reactivateUser, hardDeleteUser,
   getStatusSummary, getMonthlyStats, getLimitationAlerts, getSettlementsSummary,
@@ -125,6 +126,10 @@ router.post('/cases/:caseId/client-info', saveClientInfo);
 // Initial Interview
 router.get('/cases/:caseId/initial-interview',  getInitialInterview);
 router.post('/cases/:caseId/initial-interview', saveInitialInterview);
+
+// Accident Details
+router.get('/cases/:caseId/accident-details',  getAccidentDetails);
+router.post('/cases/:caseId/accident-details', saveAccidentDetails);
 
 // OCF Forms
 router.get('/cases/:caseId/ocf/prefill',      getOcfPrefill);
