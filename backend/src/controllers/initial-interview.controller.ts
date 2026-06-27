@@ -70,11 +70,11 @@ function mapRow(row: any, idDocs: any) {
     fileStatus:             row.file_status              || '',
 
     // ── NEW: ID Documents from case_client_id_docs ───────────────────────────
-    driverLicense:          idDocs?.driver_license_no    || '',
+    driverLicense:          idDocs?.driver_license       || '',
     driverLicenseCopy:      idDocs?.driver_license_copy  || 'No',
-    healthCard:             idDocs?.health_card_no       || '',
+    healthCard:             idDocs?.health_card          || '',
     healthCardCopy:         idDocs?.health_card_copy     || 'No',
-    sin:                    idDocs?.sin_no               || '',
+    sin:                    idDocs?.sin_number           || '',
     sinCopy:                idDocs?.sin_copy             || 'No',
     ontarioId:              !!(idDocs?.ontario_id),
     ontarioIdNo:            idDocs?.ontario_id_no        || '',
@@ -282,9 +282,9 @@ export async function saveInitialInterview(req: Request, res: Response): Promise
     if (idRow) {
       await pool.query(
         `UPDATE case_client_id_docs SET
-          driver_license_no=?,  driver_license_copy=?,
-          health_card_no=?,     health_card_copy=?,
-          sin_no=?,             sin_copy=?,
+          driver_license=?,     driver_license_copy=?,
+          health_card=?,        health_card_copy=?,
+          sin_number=?,         sin_copy=?,
           ontario_id=?,         ontario_id_no=?,   ontario_id_copy=?,
           pr_card=?,            pr_card_no=?,      pr_card_copy=?,
           citizen_card=?,       citizen_card_no=?, citizen_card_copy=?
@@ -295,9 +295,9 @@ export async function saveInitialInterview(req: Request, res: Response): Promise
       await pool.query(
         `INSERT INTO case_client_id_docs
           (id, case_id,
-           driver_license_no, driver_license_copy,
-           health_card_no,    health_card_copy,
-           sin_no,            sin_copy,
+           driver_license,    driver_license_copy,
+           health_card,       health_card_copy,
+           sin_number,        sin_copy,
            ontario_id,        ontario_id_no,  ontario_id_copy,
            pr_card,           pr_card_no,     pr_card_copy,
            citizen_card,      citizen_card_no, citizen_card_copy)
