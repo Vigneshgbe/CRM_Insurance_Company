@@ -49,6 +49,9 @@ function mapRow(row: any, idDocs: any) {
     // ── NEW: personal / header fields ────────────────────────────────────────
     salutation:             row.salutation               || '',
     gender:                 row.gender                   || '',
+    dob:                    row.dob                      || '',
+    firstName:              row.first_name               || '',
+    lastName:               row.last_name                || '',
     unitNumber:             row.unit_number              || '',
     streetNumber:           row.street_number            || '',
     postalCode:             row.postal_code              || '',
@@ -182,6 +185,9 @@ export async function saveInitialInterview(req: Request, res: Response): Promise
       // NEW personal / header fields
       b.salutation             || '',
       b.gender                 || '',
+      b.dob                    || null,
+      b.firstName              || '',
+      b.lastName               || '',
       b.unitNumber             || '',
       b.streetNumber           || '',
       b.postalCode             || '',
@@ -219,7 +225,8 @@ export async function saveInitialInterview(req: Request, res: Response): Promise
           client_charged_desc=?,    third_party_charged=?,   third_party_charged_desc=?,
           num_occupants=?,          seating_arrangement=?,   photos_of_damage=?,
           estimated_damage=?,       accident_description=?,
-          salutation=?,             gender=?,                unit_number=?,
+          salutation=?,             gender=?,                dob=?,
+          first_name=?,             last_name=?,             unit_number=?,
           street_number=?,          postal_code=?,           country=?,
           home_phone=?,             mobile=?,                other_phone=?,
           whatsapp=?,               email=?,                 marital_status=?,
@@ -245,11 +252,11 @@ export async function saveInitialInterview(req: Request, res: Response): Promise
            third_party_charged, third_party_charged_desc,
            num_occupants, seating_arrangement,
            photos_of_damage, estimated_damage, accident_description,
-           salutation, gender, unit_number, street_number, postal_code, country,
+           salutation, gender, dob, first_name, last_name, unit_number, street_number, postal_code, country,
            home_phone, mobile, other_phone, whatsapp, email,
            marital_status, dependants, language_needs, electronic_consent,
            benefit_chosen, tort_law_firm, tort_counsel, ab_counsel, secretary, file_status)
-         VALUES (?,?, ?,?,?,?, ?,?,?, ?,?,?, ?,?,?, ?,?,?,?, ?,?,?,?,?, ?,?,?,?, ?,?,?, ?,?, ?,?, ?,?, ?,?,?, ?,?,?,?,?,?, ?,?,?,?,?, ?,?,?,?, ?,?,?,?,?,?)`,
+         VALUES (?,?, ?,?,?,?, ?,?,?, ?,?,?, ?,?,?, ?,?,?,?, ?,?,?,?,?, ?,?,?,?, ?,?,?, ?,?, ?,?, ?,?, ?,?,?, ?,?,?,?,?,?,?,?,?, ?,?,?,?,?, ?,?,?,?, ?,?,?,?,?,?)`,
         [generateId(), caseId, ...interviewValues]
       );
     }
