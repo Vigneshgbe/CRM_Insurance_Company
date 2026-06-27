@@ -55,7 +55,7 @@ const TABS = [
   { key: "settlement", label: "Settlement Proposal" },
   { key: "contact-access", label: "Contact Access" },
   { key: "status", label: "Status" },
-  { key: "ocf-forms", label: "OCF Forms" },
+  // { key: "ocf-forms", label: "OCF Forms" },
 ];
 
 const statusColor: Record<string, string> = {
