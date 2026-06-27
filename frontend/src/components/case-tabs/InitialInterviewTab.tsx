@@ -144,7 +144,7 @@ export default function InitialInterviewTab({ caseId }: { caseId: string }) {
           fileStatus:       caseData?.fileStatus       || "Active",
           abCounsel:        interview?.interviewedBy   || "",
           secretary:        caseData?.secretary        || "",
-          tortLawFirm:      "",
+          tortLawFirm:      interview?.tortLawFirm    || "",
           tortCounsel:      caseData?.thirdPartyLawyer || "",
           // Personal — interview DB takes priority, case record fills blanks, then defaults
           salutation:       interview?.salutation       || "Mr.",
