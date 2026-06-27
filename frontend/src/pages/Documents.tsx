@@ -547,15 +547,13 @@ export default function Documents() {
                             title="Preview"
                             onClick={() => setPreviewDoc(d)}
                           >
-                            {/* <Eye className="h-3.5 w-3.5" /> */}
+                            <Download className="h-3.5 w-3.5" />
                           </Button>
                           <Button
                             variant="ghost" size="icon" className="h-7 w-7"
                             title="Download"
                             onClick={() => handleDownload(d)}
                           >
-                            {/* ======== In Download button replaced bu Preview  ====== */}
-                            {/* <Download className="h-3.5 w-3.5" /> */}
                             <Eye className="h-3.5 w-3.5" />
                           </Button>
                           <Button
