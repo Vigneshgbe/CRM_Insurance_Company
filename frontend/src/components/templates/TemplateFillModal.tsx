@@ -1862,40 +1862,147 @@ export default function TemplateFillModal({ templateId, templateName, caseId, on
   }, []);
 
   // Auto-fill from selected case
+// Auto-fill from selected case — calls /ocf/prefill which joins ALL relevant tables
   useEffect(() => {
     if (!selectedCaseId) return;
-    fetch(`${API}/cases/${selectedCaseId}`, { headers:{Authorization:`Bearer ${tok()}`} })
-      .then(r=>r.ok?r.json():null).then(c => {
-        if (!c) return;
-        const dob = c.client?.dateOfBirth ? c.client.dateOfBirth.split("T")[0] : "";
-        const doa = c.dateOfLoss ? c.dateOfLoss.split("T")[0] : "";
-        const map: Record<string,string> = {
-          lastName:          c.client?.lastName    || "",
-          firstName:         c.client?.firstName   || "",
-          address:           c.clientStreet        || c.client?.address || "",
-          city:              c.clientCity          || c.client?.city    || "",
-          province:          c.clientState         || c.client?.province || "ON",
-          postalCode:        c.clientZip           || c.client?.postCode || "",
-          dateOfBirth:       dob,
-          homePhone:         c.client?.homePhone   || c.clientMobile || "",
-          phone:             c.clientMobile        || c.client?.cellPhone || "",
-          email:             c.client?.email       || "",
-          maritalStatus:     c.client?.maritalStatus || "",
-          dateOfAccident:    doa,
-          fileNo:            c.fileNo              || "",
-          claimNumber:       c.claimNo             || "",
-          policyNumber:      c.policyNo            || "",
-          referredBy:        c.referredBy          || "",
-          clerkAssigned:     c.clerkAssigned       || "",
-          sigName:           `${c.client?.firstName||""} ${c.client?.lastName||""}`.trim(),
-          appSigName:        `${c.client?.firstName||""} ${c.client?.lastName||""}`.trim(),
-          decLastName:       c.client?.lastName    || "",
-          decFirstName:      c.client?.firstName   || "",
-          gender:            c.client?.gender      || "",
+    fetch(`${API}/cases/${selectedCaseId}/ocf/prefill`, { headers: { Authorization: `Bearer ${tok()}` } })
+      .then(r => r.ok ? r.json() : null)
+      .then((r: any) => {
+        if (!r) return;
+
+        // Normalise any date string to YYYY-MM-DD (HTML date input requires this exact format)
+        const fmtDate = (v: string): string => {
+          if (!v) return '';
+          // Already ISO / YYYY-MM-DD
+          if (/^\d{4}-\d{2}-\d{2}/.test(v)) return v.slice(0, 10);
+          // DD/MM/YYYY  (what formatDate() in the backend returns for some columns)
+          const p = v.split('/');
+          if (p.length === 3 && p[2].length === 4)
+            return `${p[2]}-${p[1].padStart(2,'0')}-${p[0].padStart(2,'0')}`;
+          // YYYY/MM/DD
+          const p2 = v.split('/');
+          if (p2.length === 3 && p2[0].length === 4)
+            return `${p2[0]}-${p2[1].padStart(2,'0')}-${p2[2].padStart(2,'0')}`;
+          return v;
         };
-        const keys = new Set(Object.entries(map).filter(([,v])=>v!=="").map(([k])=>k));
-        setFields(p => ({...p, ...Object.fromEntries(Object.entries(map).filter(([,v])=>v!==""))}));
+
+        const dob = fmtDate(r.dateOfBirth || '');
+        const doa = fmtDate(r.dateOfAccident || r.dateOfMva || '');
+
+        const map: Record<string, string> = {
+          // ── Applicant identity ──────────────────────────────────────
+          lastName:             r.lastName            || '',
+          firstName:            r.firstName           || '',
+          firstNameInitial:     r.firstNameInitial    || '',
+          initial:              r.initial             || '',
+          gender:               r.gender              || '',
+          dateOfBirth:          dob,
+          maritalStatus:        r.maritalStatus       || '',
+          dependants:           r.dependants          || '',
+
+          // ── Contact ─────────────────────────────────────────────────
+          address:              r.address             || '',
+          city:                 r.city                || '',
+          province:             r.province            || 'ON',
+          postalCode:           r.postalCode          || '',
+          homePhone:            r.homePhone           || '',
+          workPhone:            r.workPhone           || '',
+          cellPhone:            r.cellPhone           || '',
+          phone:                r.phone               || r.cellPhone || r.homePhone || '',
+          extension:            '',
+          email:                r.email               || '',
+
+          // ── Case / dates ────────────────────────────────────────────
+          dateOfAccident:       doa,
+          dateOfMVA:            doa,
+          fileNo:               r.fileNo              || '',
+          referredBy:           r.referredBy          || '',
+          interviewedBy:        r.interviewedBy       || '',
+          clerkAssigned:        r.clerkAssigned       || '',
+
+          // ── First-party insurance (from case_insurance_first_party / case_no_fault) ──
+          claimNumber:          r.claimNumber         || '',
+          policyNumber:         r.policyNumber        || '',
+          insurerName:          r.insurerName         || '',
+          insurerCity:          r.insurerCity         || '',
+          insurerAddress:       r.insurerAddress      || '',
+          adjusterLast:         r.adjusterLast        || '',
+          adjusterFirst:        r.adjusterFirst       || '',
+          adjusterPhone:        r.adjusterPhone       || '',
+          adjusterFax:          r.adjusterFax         || '',
+          adjusterExt:          r.adjusterExt         || '',
+          namedInsured:         r.namedInsured        || '',
+          policyHolderLast:     r.policyHolderLast    || '',
+          policyHolderFirst:    r.policyHolderFirst   || '',
+          policyHolderName:     r.namedInsured        || '',
+          // vehicle
+          fp_autoMake:          r.autoMake            || '',
+          fp_autoModel:         r.autoModel           || '',
+          fp_autoYear:          r.autoYear            || '',
+          fp_plateNo:           r.plateNumber         || '',
+          fp_insurerName:       r.insurerName         || '',
+          fp_insurerCity:       r.insurerCity         || '',
+          fp_adjuster:          r.adjusterName        || '',
+          fp_phone:             r.adjusterPhone       || '',
+          fp_fax:               r.adjusterFax         || '',
+          fp_claimNo:           r.claimNumber         || '',
+          fp_policyNo:          r.policyNumber        || '',
+          fp_policyHolder:      r.namedInsured        || '',
+
+          // ── Third party (from case_third_party / case_third_party_insurance) ──
+          tp_driverName:        r.tpDriverName        || '',
+          tp_driverLicenseNo:   r.tpDriverLicenseNo   || '',
+          tp_driverPhone:       r.tpDriverPhone       || '',
+          tp_driverAddress:     r.tpDriverAddress     || '',
+          tp_autoMake:          r.tpAutoMake          || '',
+          tp_autoModel:         r.tpAutoModel         || '',
+          tp_autoYear:          r.tpAutoYear          || '',
+          tp_plateNo:           r.tpPlateNo           || '',
+          tp_insurerName:       r.tpInsurerName       || '',
+          tp_adjuster:          r.tpAdjusterName      || '',
+          tp_phone:             r.tpPhone             || '',
+          tp_fax:               r.tpFax               || '',
+          tp_claimNo:           r.tpClaimNo           || '',
+          tp_policyNo:          r.tpPolicyNo          || '',
+
+          // ── Accident details (from case_accident_details) ────────────
+          accidentLocation:     r.accidentLocation    || '',
+          accidentDescription:  r.accidentDescription || '',
+          accidentStreet:       r.accidentStreet      || '',
+          accidentIntersection: r.accidentIntersection|| '',
+          accidentCity:         r.accidentCity        || '',
+          accidentProvince:     r.accidentProvince    || '',
+          timeOfAccident:       r.timeOfAccident      || '',
+          timeOfMVA:            r.timeOfAccident      || '',
+
+          // ── Matrix intake interview fields ────────────────────────────
+          conflictChecked:      r.conflictChecked     || '',
+          conflictFind:         r.conflictFind        || '',
+          speaksEnglish:        r.speaksEnglish       || '',
+          needsInterpreter:     r.needsInterpreter    || '',
+          bornInCanada:         r.bornInCanada        || '',
+          seatBelted:           r.seatBelted          || '',
+          accidentAtWork:       r.accidentAtWork      || '',
+          policeReported:       r.policeReported      || '',
+          benefitChoice:        r.benefitChosen       || '',
+          benefitElection:      r.benefitChosen       || '',
+
+          // ── Signature pre-fill ────────────────────────────────────────
+          sigName:              r.fullName            || '',
+          appSigName:           r.fullName            || '',
+          decLastName:          r.lastName            || '',
+          decFirstName:         r.firstName           || '',
+        };
+
+        // Only set non-empty values, preserve anything user already typed
+        const filled = Object.fromEntries(Object.entries(map).filter(([, v]) => v !== ''));
+        const keys = new Set(Object.keys(filled));
+        setFields(prev => ({ ...prev, ...filled }));
         setAutoFilled(keys);
+      })
+      .catch((err) => {
+        console.error('[OCF prefill failed]', err);
+        // Silent fallback — user can still fill manually
       });
   }, [selectedCaseId]);
 

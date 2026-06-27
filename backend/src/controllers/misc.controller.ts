@@ -154,60 +154,201 @@ export async function saveOcfFormData(req: Request, res: Response): Promise<void
   } catch (err) { res.status(500).json({ error: 'Server error' }); }
 }
 
+// ── GET /api/cases/:caseId/ocf/prefill ───────────────────────────────────────
+// Pulls from ALL relevant tables for maximum OCF auto-fill
+// Tables joined: cases, clients, case_no_fault, case_insurance_first_party,
+//                case_initial_interview, case_accident_details, case_third_party,
+//                case_third_party_insurance
 export async function getOcfPrefill(req: Request, res: Response): Promise<void> {
   const { caseId } = req.params;
   try {
-    const [rows] = await pool.query(
-      `SELECT ca.*, cl.first_name, cl.last_name, cl.initial, cl.address, cl.city, cl.province,
-        cl.post_code, cl.date_of_birth, cl.home_phone, cl.work_phone, cl.cell_phone, cl.email,
-        cl.marital_status, cl.dependants, cl.gender,
-        nf.claim_no, nf.policy_no, nf.mva_company, nf.adjuster_name,
-        nf.mva_phone as adjuster_phone, nf.mva_address as ins_address,
-        nf.mva_city as ins_city, nf.mva_postal as ins_postal, nf.named_insured
+    // 1. Core case + client data
+    const [caseRows] = await pool.query(
+      `SELECT ca.*,
+              cl.first_name, cl.last_name, cl.initial, cl.address, cl.city,
+              cl.province, cl.post_code, cl.date_of_birth, cl.home_phone,
+              cl.work_phone, cl.cell_phone, cl.email, cl.marital_status,
+              cl.dependants, cl.gender
        FROM cases ca
-       LEFT JOIN clients cl ON ca.client_id = cl.id
-       LEFT JOIN case_no_fault nf ON nf.case_id = ca.id
+       LEFT JOIN clients cl ON cl.id = ca.client_id
        WHERE ca.id = ?`,
       [caseId]
     ) as any[];
-    const r = (rows as any[])[0];
-    if (!r) { res.status(404).json({ error: 'Case not found' }); return; }
+    const c = Array.isArray(caseRows) ? caseRows[0] : null;
+    if (!c) { res.status(404).json({ error: 'Case not found' }); return; }
+
+    // 2. No-fault (first party via NoFaultTab — mva_company, claim_no, policy_no)
+    const [nfRows] = await pool.query(
+      'SELECT * FROM case_no_fault WHERE case_id = ? LIMIT 1', [caseId]
+    ) as any[];
+    const nf = Array.isArray(nfRows) ? nfRows[0] : null;
+
+    // 3. Insurance first party (InsuranceInformationSection — insurance_company, claim_no, policy_no)
+    const [fpRows] = await pool.query(
+      'SELECT * FROM case_insurance_first_party WHERE case_id = ? LIMIT 1', [caseId]
+    ) as any[];
+    const fp = Array.isArray(fpRows) ? fpRows[0] : null;
+
+    // 4. Initial interview (has stored first_name, last_name, dob, phones, marital)
+    const [iiRows] = await pool.query(
+      'SELECT * FROM case_initial_interview WHERE case_id = ? LIMIT 1', [caseId]
+    ) as any[];
+    const ii = Array.isArray(iiRows) ? iiRows[0] : null;
+
+    // 5. Accident details
+    const [adRows] = await pool.query(
+      'SELECT * FROM case_accident_details WHERE case_id = ? LIMIT 1', [caseId]
+    ) as any[];
+    const ad = Array.isArray(adRows) ? adRows[0] : null;
+
+    // 6. Third party driver + insurance
+    const [tpRows] = await pool.query(
+      'SELECT * FROM case_third_party WHERE case_id = ? LIMIT 1', [caseId]
+    ) as any[];
+    const tp = Array.isArray(tpRows) ? tpRows[0] : null;
+
+    const [tpiRows] = await pool.query(
+      'SELECT * FROM case_third_party_insurance WHERE case_id = ? LIMIT 1', [caseId]
+    ) as any[];
+    const tpi = Array.isArray(tpiRows) ? tpiRows[0] : null;
+
+    // Helper: format date to YYYY-MM-DD for HTML date inputs
+    const fmtDate = (v: any): string => {
+      if (!v) return '';
+      if (v instanceof Date) return v.toISOString().slice(0, 10);
+      const s = String(v);
+      if (/^\d{4}-\d{2}-\d{2}/.test(s)) return s.slice(0, 10);
+      return s;
+    };
+
+    // Prefer interview data for personal fields (most recently entered by staff),
+    // fall back to clients table
+    const firstName     = ii?.first_name     || c.first_name     || '';
+    const lastName      = ii?.last_name      || c.last_name      || '';
+    const initial       = c.initial          || '';
+    const dob           = fmtDate(ii?.dob    || c.date_of_birth);
+    const gender        = ii?.gender         || c.gender         || '';
+    const maritalStatus = ii?.marital_status || c.marital_status || '';
+    const dependants    = String(c.dependants || 0);
+    const homePhone     = ii?.home_phone     || c.home_phone     || '';
+    const workPhone     = c.work_phone       || '';
+    const cellPhone     = ii?.mobile         || c.cell_phone     || '';
+    const email         = ii?.email          || c.email          || '';
+
+    // Address: prefer case-stored (client_street from CaseDetail edits), then clients table
+    const address    = c.client_street || c.address || '';
+    const city       = c.client_city   || c.city    || '';
+    const province   = c.client_state  || c.province || '';
+    const postalCode = c.client_zip    || c.post_code || '';
+
+    // Insurance: prefer case_insurance_first_party (InsuranceInformationSection),
+    // fall back to case_no_fault (NoFaultTab)
+    const insurerName    = fp?.insurance_company || nf?.mva_company    || '';
+    const insurerCity    = fp?.city              || nf?.mva_city        || '';
+    const insurerAddress = fp?.address           || nf?.mva_address     || '';
+    const adjusterName   = fp?.adjuster_name     || nf?.adjuster_name   || '';
+    const adjusterPhone  = fp?.adjuster_phone    || nf?.mva_phone       || '';
+    const adjusterFax    = fp?.adjuster_fax      || nf?.mva_fax         || '';
+    const adjusterExt    = fp?.adjuster_ext      || '';
+    const claimNumber    = fp?.claim_no          || nf?.claim_no        || '';
+    const policyNumber   = fp?.policy_no         || nf?.policy_no       || '';
+    const namedInsured   = fp?.policy_holder_name|| nf?.named_insured   || '';
+    const autoMake       = nf?.auto_make         || '';
+    const autoModel      = nf?.auto_model        || '';
+    const autoYear       = nf?.auto_year         || '';
+    const plateNumber    = nf?.plate_number      || '';
+
+    // Dates
+    const dateOfAccident = fmtDate(c.date_of_loss || ad?.accident_date);
+    const dateOfMva      = fmtDate(c.date_of_loss);
+
+    // Accident details
+    const accidentLocation   = ad ? `${ad.street_name || ''} & ${ad.major_intersection || ''}, ${ad.city || ''}, ${ad.province_state || ''}`.replace(/^& /, '').replace(/, $/, '') : '';
+    const accidentDescription= ad?.accident_description || '';
+    const accidentStreet     = ad?.street_name        || '';
+    const accidentIntersection = ad?.major_intersection || '';
+    const accidentCity       = ad?.city               || '';
+    const accidentProvince   = ad?.province_state     || '';
+    const timeOfAccident     = ad?.accident_time      ? String(ad.accident_time).slice(0, 5) : '';
+
+    // Third party
+    const tpDriverName      = tp?.driver_name         || '';
+    const tpDriverLicenseNo = tp?.driver_license      || '';
+    const tpDriverPhone     = tp?.home_phone          || '';
+    const tpDriverAddress   = tp?.driver_address      || '';
+    const tpAutoMake        = tp?.auto_make           || '';
+    const tpAutoModel       = tp?.auto_model          || '';
+    const tpAutoYear        = tp?.auto_year           || '';
+    const tpPlateNo         = tp?.plate_number        || '';
+    const tpInsurerName     = tpi?.insurance_company  || '';
+    const tpAdjusterName    = tpi?.adjuster_name      || '';
+    const tpPhone           = tpi?.ins_phone          || '';
+    const tpFax             = tpi?.ins_fax            || '';
+    const tpClaimNo         = tpi?.claim_number       || '';
+    const tpPolicyNo        = tpi?.policy_number      || '';
+
+    // Matrix intake interview fields
+    const conflictChecked   = ii?.conflict_checked    || '';
+    const conflictFind      = ii?.any_conflict        || '';
+    const interviewedBy     = ii?.interviewed_by      || c.clerk_assigned || '';
+    const referredBy        = ii?.referred_by         || c.referred_by    || '';
+    const speaksEnglish     = ii?.speaks_english      || '';
+    const needsInterpreter  = ii?.interpreter_required|| '';
+    const bornInCanada      = ii?.born_in_canada      || '';
+    const seatBelted        = ii?.seat_belted         || '';
+    const accidentAtWork    = ii?.accident_at_work    || '';
+    const policeReported    = ii?.police_reported     || ad?.reported_police || '';
+    const benefitChosen     = ii?.benefit_chosen      || '';
+
+    const fullName = `${firstName} ${lastName}`.trim();
+
+    // Split adjuster name into parts for forms that need Last/First separately
+    const adjusterParts = adjusterName ? adjusterName.trim().split(' ') : [];
+    const adjusterLast  = adjusterParts.length > 1 ? adjusterParts.slice(-1)[0] : adjusterName;
+    const adjusterFirst = adjusterParts.length > 1 ? adjusterParts.slice(0, -1).join(' ') : '';
+
+    const namedParts    = namedInsured ? namedInsured.trim().split(' ') : [];
+    const policyHolderLast  = namedParts.length > 1 ? namedParts.slice(-1)[0] : namedInsured;
+    const policyHolderFirst = namedParts.length > 1 ? namedParts.slice(0, -1).join(' ') : '';
+
     res.json({
-      claimNumber: r.claim_no || r.file_no || '',
-      policyNumber: r.policy_no || '',
-      dateOfAccident: formatDate(r.date_of_loss) || '',
-      lastName: r.last_name || '',
-      firstName: r.first_name || '',
-      firstNameInitial: `${r.first_name||''} ${r.initial||''}`.trim(),
-      initial: r.initial || '',
-      gender: r.gender || '',
-      address: r.address || '',
-      city: r.city || '',
-      province: r.province || '',
-      postalCode: r.post_code || '',
-      birthDate: formatDate(r.date_of_birth) || '',
-      dateOfBirth: formatDate(r.date_of_birth) || '',
-      homeTelephone: r.home_phone || '',
-      homePhone: r.home_phone || '',
-      workTelephone: r.work_phone || '',
-      workPhone: r.work_phone || '',
-      cellPhone: r.cell_phone || '',
-      email: r.email || '',
-      maritalStatus: r.marital_status || '',
-      dependants: String(r.dependants||0),
-      insuranceCompanyName: r.mva_company || '',
-      adjusterName: r.adjuster_name || '',
-      adjusterPhone: r.adjuster_phone || '',
-      insAddress: r.ins_address || '',
-      insCity: r.ins_city || '',
-      insPostal: r.ins_postal || '',
-      namedInsured: r.named_insured || '',
-      fileNo: r.file_no || '',
-      referredBy: r.referred_by || '',
-      interviewedBy: r.clerk_assigned || '',
-      dateOfMva: formatDate(r.date_of_loss) || '',
+      // Identity
+      firstName, lastName, initial, gender, maritalStatus, dependants,
+      dateOfBirth: dob, firstNameInitial: `${firstName} ${initial}`.trim(),
+      fullName,
+      // Contact
+      address, city, province, postalCode,
+      homePhone, workPhone, cellPhone, phone: cellPhone || homePhone,
+      email,
+      // Case
+      fileNo: c.file_no || '', dateOfAccident, dateOfMva,
+      referredBy, interviewedBy, clerkAssigned: c.clerk_assigned || '',
+      conflictChecked, conflictFind,
+      // First-party insurance
+      claimNumber, policyNumber, insurerName, insurerCity, insurerAddress,
+      adjusterName, adjusterLast, adjusterFirst,
+      adjusterPhone, adjusterFax, adjusterExt,
+      namedInsured, policyHolderLast, policyHolderFirst,
+      autoMake, autoModel, autoYear, plateNumber,
+      // Accident details
+      accidentLocation, accidentDescription,
+      accidentStreet, accidentIntersection, accidentCity, accidentProvince,
+      timeOfAccident,
+      // Third party
+      tpDriverName, tpDriverLicenseNo, tpDriverPhone, tpDriverAddress,
+      tpAutoMake, tpAutoModel, tpAutoYear, tpPlateNo,
+      tpInsurerName, tpAdjusterName, tpPhone, tpFax, tpClaimNo, tpPolicyNo,
+      // Matrix intake
+      speaksEnglish, needsInterpreter, bornInCanada, seatBelted,
+      accidentAtWork, policeReported, benefitChosen,
+      // Signature pre-fill
+      sigName: fullName, appSigName: fullName,
+      decLastName: lastName, decFirstName: firstName,
     });
-  } catch (err) { console.error(err); res.status(500).json({ error: 'Server error' }); }
+  } catch (err) {
+    console.error('[getOcfPrefill]', err);
+    res.status(500).json({ error: 'Server error', detail: (err as any).message });
+  }
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
