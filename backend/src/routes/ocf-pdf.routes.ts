@@ -1,6 +1,6 @@
 import { Router } from 'express';
 import { generateOcfPdf } from '../controllers/ocf-pdf.controller';
-import { authMiddleware } from '../middlewares/auth.middleware';
+import { authenticate } from '../middlewares/auth.middleware';
 
 const router = Router();
 
@@ -14,6 +14,6 @@ const router = Router();
  *   For OCF-10: { benefitElection: "income_replacement" | "non_earner" | "caregiver" }
  *   Any other field can be overridden by passing it in the body.
  */
-router.post('/:caseId/ocf/:formNumber/generate', authMiddleware, generateOcfPdf);
+router.post('/:caseId/ocf/:formNumber/generate', authenticate, generateOcfPdf);
 
 export default router;

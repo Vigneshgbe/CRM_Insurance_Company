@@ -38,6 +38,7 @@ import {
 
 const router = Router();
 
+// inside where routes are registered:
 app.use('/api/cases', ocfPdfRoutes);
 
 // Public
