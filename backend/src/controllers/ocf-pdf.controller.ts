@@ -363,28 +363,35 @@ async function getCasePrefillData(caseId: string): Promise<Record<string, string
       cl.email,
       cid.driver_license     AS driverLicenseNo,
       cid.ohip_number        AS ohipNumber,
-      cnf.company            AS insCompanyName,
-      cnf.adjuster           AS insAdjuster,
-      cnf.address            AS insAddress,
-      cnf.city               AS insCity,
-      cnf.postal             AS insPostal,
-      cnf.phone              AS insPhone,
-      cnf.fax                AS insFax,
+      cnf.mva_company        AS insCompanyName,
+      cnf.adjuster_name      AS insAdjuster,
+      cnf.mva_address        AS insAddress,
+      cnf.mva_city           AS insCity,
+      cnf.mva_postal         AS insPostal,
+      cnf.mva_phone          AS insPhone,
+      cnf.mva_fax            AS insFax,
       cnf.claim_no           AS policyNumber,
+      cnf.policy_no          AS insPolicyNo,
       emp.employer_name      AS emp1Name,
       emp.address            AS emp1Address,
       emp.city               AS emp1City,
       emp.province           AS emp1Province,
-      emp.postal             AS emp1Postal,
+      emp.postal_code        AS emp1Postal,
       emp.phone              AS emp1Phone,
-      cmed.family_doctor     AS familyDoctor,
-      cmed.family_doctor_phone AS familyDoctorPhone
+      cmh.doctor_name        AS familyDoctor,
+      cmh.doctor_phone       AS familyDoctorPhone,
+      cmh.doctor_address     AS doctorAddress,
+      cmh.doctor_city        AS doctorCity,
+      cmh.doctor_fax         AS doctorFax,
+      cmp.centre             AS tp1Centre,
+      cmp.phone              AS tp1Phone
     FROM cases ca
     LEFT JOIN clients cl              ON ca.client_id = cl.id
     LEFT JOIN case_client_id_docs cid ON ca.id = cid.case_id
     LEFT JOIN case_no_fault cnf       ON ca.id = cnf.case_id
-    LEFT JOIN case_employers emp      ON ca.id = emp.case_id AND emp.order_num = 1
-    LEFT JOIN case_medical cmed       ON ca.id = cmed.case_id
+    LEFT JOIN case_employers emp      ON ca.id = emp.case_id AND emp.employer_order = 1
+    LEFT JOIN case_medical_hospital cmh ON ca.id = cmh.case_id
+    LEFT JOIN case_medical_providers cmp ON ca.id = cmp.case_id AND cmp.provider_order = 1
     WHERE ca.id = ?
     LIMIT 1`,
     [caseId]
