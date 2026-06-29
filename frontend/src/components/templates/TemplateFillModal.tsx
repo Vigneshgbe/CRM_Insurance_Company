@@ -1916,7 +1916,24 @@ export default function TemplateFillModal({ templateId, templateName, caseId, on
         }
 
         // ── Step 3: Add aliases for fields that MatrixIntakeForm uses
-        //    under different key names than what the backend returns ──────────────
+        // OCF form field key aliases
+        if (!filled.postalCode && filled.postCode) filled.postalCode = filled.postCode;
+        if (!filled.phone && filled.homePhone) filled.phone = filled.homePhone;
+        if (!filled.driverLicence && filled.driverLicenseNo) filled.driverLicence = filled.driverLicenseNo;
+        if (!filled.insurerName && filled.insCompanyName) filled.insurerName = filled.insCompanyName;
+        if (!filled.insurerCity && filled.insCity) filled.insurerCity = filled.insCity;
+        if (!filled.insurerAddress && filled.insAddress) filled.insurerAddress = filled.insAddress;
+        if (!filled.insurerPostalCode && filled.insPostal) filled.insurerPostalCode = filled.insPostal;
+        if (!filled.insurerPhone && filled.insPhone) filled.insurerPhone = filled.insPhone;
+        if (!filled.insurerFax && filled.insFax) filled.insurerFax = filled.insFax;
+        if (!filled.adjusterLast && filled.insAdjuster) filled.adjusterLast = filled.insAdjuster;
+        if (!filled.adjusterPhone && filled.insPhone) filled.adjusterPhone = filled.insPhone;
+        if (!filled.adjusterFax && filled.insFax) filled.adjusterFax = filled.insFax;
+        if (!filled.hpName && filled.familyDoctor) filled.hpName = filled.familyDoctor;
+        if (!filled.hpPhone && filled.familyDoctorPhone) filled.hpPhone = filled.familyDoctorPhone;
+        if (!filled.hpAddress && filled.doctorAddress) filled.hpAddress = filled.doctorAddress;
+        if (!filled.hpCity && filled.doctorCity) filled.hpCity = filled.doctorCity;
+        if (!filled.hpFax && filled.doctorFax) filled.hpFax = filled.doctorFax;
 
         // MatrixIntake uses "cellPhone", backend returns "cellPhone" directly ✓
         // MatrixIntake "wentToHospital" shown as Radio Yes/No — backend returns "No"/"Yes" ✓
