@@ -112,8 +112,7 @@ export default function CaseDetail() {
       benefitsClaiming: "No", irbNonEarnerDue: "No",
       clientInitials: "", clientStreet: "", clientCity: "",
       clientState: "", clientZip: "", clientCountry: "Canada", clientMobile: "",
-      clientFirstName: "",
-      clientLastName: "",
+      clientFirstName: "", clientLastName: "",
     },
   });
 
@@ -153,8 +152,8 @@ export default function CaseDetail() {
             clientZip:         cData.clientZip         || "",
             clientCountry:     cData.clientCountry     || "Canada",
             clientMobile:      cData.clientMobile      || "",
-            clientFirstName:   cData.client?.firstName || cData.firstName || "",
-            clientLastName:    cData.client?.lastName  || cData.lastName  || "",
+            clientFirstName:   cData.client?.firstName || "",
+            clientLastName:    cData.client?.lastName  || "",
           });
         }
         setReferrers(Array.isArray(refs) ? refs : []);
@@ -209,8 +208,8 @@ export default function CaseDetail() {
         clientZip:         caseData.clientZip         || "",
         clientCountry:     caseData.clientCountry     || "Canada",
         clientMobile:      caseData.clientMobile      || "",
-        clientFirstName:   caseData.client?.firstName || caseData.firstName || "",
-        clientLastName:    caseData.client?.lastName  || caseData.lastName  || "",
+        clientFirstName:   caseData.client?.firstName || "",
+        clientLastName:    caseData.client?.lastName  || "",
       });
     }
     setEditing(false);
@@ -331,8 +330,14 @@ export default function CaseDetail() {
               {/* Client Name */}
               <div className="bg-muted/50 px-3 py-1.5 rounded text-xs font-semibold text-foreground mb-3">Client Name</div>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mb-4">
-                <div><Label className="text-xs">First Name</Label><Input {...register("clientFirstName")} className="h-8 text-xs mt-1" /></div>
-                <div><Label className="text-xs">Last Name</Label><Input {...register("clientLastName")} className="h-8 text-xs mt-1" /></div>
+                <div>
+                  <Label className="text-xs">First Name</Label>
+                  <Input {...register("clientFirstName")} className="h-8 text-xs mt-1" />
+                </div>
+                <div>
+                  <Label className="text-xs">Last Name</Label>
+                  <Input {...register("clientLastName")} className="h-8 text-xs mt-1" />
+                </div>
               </div>
 
               {/* File Information */}

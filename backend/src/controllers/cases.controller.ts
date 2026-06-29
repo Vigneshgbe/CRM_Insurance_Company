@@ -175,6 +175,7 @@ export async function updateCase(req: Request, res: Response): Promise<void> {
     clientState, clientZip, clientCountry, clientMobile, abCounsel, tortLawFirm, tortCounsel,
     clientFirstName, clientLastName,
   } = req.body;
+
   try {
     const [oldRows] = await pool.query('SELECT file_status, client_id FROM cases WHERE id = ?', [caseId]) as any[];
     const oldStatus = (oldRows as any[])[0]?.file_status;
@@ -197,7 +198,7 @@ export async function updateCase(req: Request, res: Response): Promise<void> {
        clientCountry||'Canada', clientMobile||'', abCounsel||'', tortLawFirm||'', tortCounsel||'', caseId]
     );
 
-    // ── Update client name in clients table if provided ───────────────────
+    // ── Update client name if provided ────────────────────────────────────────
     if (clientId && (clientFirstName !== undefined || clientLastName !== undefined)) {
       const updates: string[] = [];
       const vals: any[] = [];
