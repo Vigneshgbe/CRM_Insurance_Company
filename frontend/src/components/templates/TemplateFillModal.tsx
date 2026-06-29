@@ -1954,21 +1954,101 @@ export default function TemplateFillModal({ templateId, templateName, caseId, on
   const FormComponent = FORM_MAP[templateId];
 
   const handleExport = async () => {
+    const OCF_FORM_NUMBERS: Record<string, string> = {
+      "ocf-1":  "1",
+      "ocf-2":  "2",
+      "ocf-3":  "3",
+      "ocf-4":  "4",
+      "ocf-5":  "5",
+      "ocf-6":  "6",
+      "ocf-10": "10",
+      "ocf-18": "18",
+      "ocf-19": "19",
+      "ocf-23": "23",
+    };
+
+    const formNumber = OCF_FORM_NUMBERS[templateId];
+
+    // Matrix intake or no case selected — fall back to jsPDF
+    if (!formNumber || !selectedCaseId) {
+      setExporting(true);
+      try {
+        const allFields = { ...fields };
+        if (templateId === "ocf-6") {
+          expenses.forEach((e, i) => {
+            allFields[`expenseDate${i}`] = e.date;
+            allFields[`expenseDesc${i}`] = e.desc;
+            allFields[`expenseAmt${i}`] = e.amount;
+          });
+        }
+        await exportToPDF(allFields, templateId, templateName);
+        toast({ title: "PDF exported successfully", description: templateName });
+      } catch (err) {
+        console.error(err);
+        toast({ title: "Export failed", description: "Please try again", variant: "destructive" });
+      } finally {
+        setExporting(false);
+      }
+      return;
+    }
+
+    // OCF form + case selected — POST to backend, get real filled government PDF
     setExporting(true);
     try {
-      const allFields = { ...fields };
+      const body: Record<string, any> = {};
+
       if (templateId === "ocf-6") {
-        expenses.forEach((e,i) => {
-          allFields[`expenseDate${i}`] = e.date;
-          allFields[`expenseDesc${i}`] = e.desc;
-          allFields[`expenseAmt${i}`] = e.amount;
-        });
+        body.expenses = expenses
+          .filter(e => e.date || e.desc || e.amount)
+          .map(e => ({ item: "", date: e.date, description: e.desc, amount: e.amount }));
+        const total = expenses.reduce((s, e) => s + (parseFloat(e.amount) || 0), 0);
+        body.expenseTotal = `$${total.toFixed(2)}`;
       }
-      await exportToPDF(allFields, templateId, templateName);
+
+      if (templateId === "ocf-10") {
+        const electionMap: Record<string, string> = {
+          "Income Replacement Benefit": "income_replacement",
+          "Non-Earner Benefit":         "non_earner",
+          "Caregiver Benefit":          "caregiver",
+        };
+        body.benefitElection = electionMap[fields.benefitElection] || "";
+      }
+
+      const response = await fetch(
+        `${API}/cases/${selectedCaseId}/ocf/${formNumber}/generate`,
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${tok()}`,
+          },
+          body: JSON.stringify(body),
+        }
+      );
+
+      if (!response.ok) {
+        const errText = await response.text();
+        throw new Error(`Server error ${response.status}: ${errText}`);
+      }
+
+      const blob = await response.blob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `${templateName.replace(/[^a-zA-Z0-9]/g, "_")}_${new Date().toISOString().slice(0, 10)}.pdf`;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      URL.revokeObjectURL(url);
+
       toast({ title: "PDF exported successfully", description: templateName });
-    } catch(err) {
-      console.error(err);
-      toast({ title: "Export failed", description: "Please try again", variant:"destructive" });
+    } catch (err: any) {
+      console.error("[OCF export error]", err);
+      toast({
+        title: "Export failed",
+        description: err.message || "Please try again",
+        variant: "destructive",
+      });
     } finally {
       setExporting(false);
     }
