@@ -103,7 +103,12 @@ export async function getOcfPrefill(req: Request, res: Response): Promise<void> 
               interviewed_by, referred_by, speaks_english, interpreter_required,
               born_in_canada, seat_belted, accident_at_work, police_reported,
               street_name, major_intersection, city AS ii_city,
-              province AS ii_province, time_of_mva, benefit_chosen
+              province AS ii_province, time_of_mva, benefit_chosen,
+              police_department, incident_no, officer_name, badge_no,
+              client_charged, client_charged_desc,
+              third_party_charged, third_party_charged_desc,
+              num_occupants, seating_arrangement, estimated_damage,
+              photos_of_damage, accident_description AS ii_accident_desc
        FROM case_initial_interview WHERE case_id = ? LIMIT 1`, [caseId]
     ) as any[];
     const ii: any = Array.isArray(iiRows) && iiRows[0] ? iiRows[0] : {};
@@ -515,13 +520,13 @@ export async function getOcfPrefill(req: Request, res: Response): Promise<void> 
       transPostal:s((lwTrans as any).postal_code), transPhone:  s((lwTrans as any).phone),
       transFax:   s((lwTrans as any).fax),         transExt:    s((lwTrans as any).ext),
 
-      // ── Police Info ────────────────────────────────────────────────────────
+      // ── Police Info (ii = InitialInterviewTab wins, pi = PoliceInfoTab fallback) ──
       policeReportedDate:  s(pi.reported_date),
       policeReportOrdered: s(pi.report_ordered),
-      policeCentre:        s(pi.police_centre),
-      policeOfficer:       s(pi.police_officer),
-      policeBadgeNo:       s(pi.badge_number),
-      policeIncidentNo:    s(pi.incident_no),
+      policeCentre:        s(ii.police_department) || s(pi.police_centre),
+      policeOfficer:       s(ii.officer_name)      || s(pi.police_officer),
+      policeBadgeNo:       s(ii.badge_no)          || s(pi.badge_number),
+      policeIncidentNo:    s(ii.incident_no)       || s(pi.incident_no),
       policeDivision:      s(pi.division),
       policeAddress:       s(pi.address),
       policeCity:          s(pi.city),
@@ -530,11 +535,18 @@ export async function getOcfPrefill(req: Request, res: Response): Promise<void> 
       policeIntersection:  s(pi.intersection),
       policeTimeOfAccident:s(pi.time_of_accident),
       policeAccidentDesc:  s(pi.accident_description),
-      // also as incidentNo/officerName/badgeNo for InitialInterviewTab
-      incidentNo:    s(pi.incident_no),
-      officerName:   s(pi.police_officer),
-      badgeNo:       s(pi.badge_number),
-      policeDepartment: s(pi.police_centre),
+      // MatrixIntake Accident Details section keys
+      incidentNo:          s(ii.incident_no)        || s(pi.incident_no),
+      officerName:         s(ii.officer_name)       || s(pi.police_officer),
+      badgeNo:             s(ii.badge_no)           || s(pi.badge_number),
+      policeDepartment:    s(ii.police_department)  || s(pi.police_centre),
+      clientCharged:       s(ii.client_charged)     || s(ad.client_charged),
+      clientChargedDesc:   s(ii.client_charged_desc)|| s(ad.client_charged_desc),
+      thirdPartyCharged:   s(ii.third_party_charged)|| s(ad.third_party_charged),
+      numOccupants:        s(ii.num_occupants)      || s(ad.num_occupants),
+      seatingArrangement:  s(ii.seating_arrangement)|| s(ad.seating_arrangement),
+      estimatedDamage:     safeNum(ii.estimated_damage) || safeNum(ad.estimated_damage),
+      photosDamage:        s(ii.photos_of_damage)   || s(ad.photos_of_damage),
 
       // ── Specialist ─────────────────────────────────────────────────────────
       specialistCompany:  s(sp.company),
