@@ -43,7 +43,7 @@ app.use(errorHandler);
 async function start() {
   await testConnection();
   app.listen(PORT, () => {
-    console.log(`🚀 Hypernova CRM API running on http://localhost:${PORT}`);
+    console.log(`🚀 Padak (PVT) LTD CRM API running on http://localhost:${PORT}`);
     console.log(`   DB: ${process.env.DB_NAME || 'padak_insurance_crm'}`);
     console.log(`   ENV: ${process.env.NODE_ENV || 'development'}`);
   });
