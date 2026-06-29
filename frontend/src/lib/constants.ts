@@ -76,23 +76,25 @@ export const CAR_MAKES = ["Toyota", "Honda", "Ford", "Chevrolet", "Hyundai", "Ki
 export const JOB_DESCRIPTIONS = ["Office Worker", "Manual Labour", "Professional", "Sales", "Healthcare", "Education", "Construction", "Transportation", "Retail", "Food Service", "Self-Employed", "Other"];
 
 export const PHYSICAL_CONDITIONS = [
-  "Head", "Face", "Eyes", "Nose", "Ears", "Jaw", "Teeth", "Neck", "Shoulders",
-  "Arms", "Wrists", "Hands", "Fingers", "Chest", "Ribs", "Abdomen", "Upper Back",
-  "Mid Back", "Lower Back", "Hips", "Pelvis", "Thighs", "Knees", "Legs", "Ankles", "Feet", "Toes",
+  "Head", "Face L/R", "Eyes L/R", "Nose L/R", "Ears L/R", "Jaw L/R", "Teeth L/R", "Neck L/R",
+  "Shoulders L/R", "Arms L/R", "Wrists L/R", "Hands L/R", "Fingers L/R", "Chest", "Ribs L/R",
+  "Abdomen L/R", "Upper Back", "Mid Back", "Lower Back", "Hips L/R", "Pelvis L/R", "Thighs L/R",
+  "Knees L/R", "Legs L/R", "Ankles L/R", "Feet L/R", "Toes L/R",
+  "Radiating pain down Arm(s) L/R", "Radiating pain down Leg(s) L/R",
 ];
 
 export const NEUROLOGICAL_CONDITIONS = [
-  "Headaches", "Dizziness", "Ringing in ears", "Hearing problems",
+  "Headaches", "Dizziness", "Ringing in the ears", "Problems with hearing",
   "Blurred Vision", "Forgetfulness", "Tingling", "Numbness",
 ];
 
 export const PSYCHOLOGICAL_CONDITIONS = [
   "Irritability", "Anxiety", "Stress", "Depression", "Lack of sleep",
-  "Nightmares", "Flashbacks to MVA", "Periodic crying", "Low self-esteem",
-  "Loss of incentive", "Fear of driving", "Nervous when passenger",
+  "Nightmares (general)", "Flashbacks to MVA", "Periodic crying", "Low self-esteem",
+  "Loss of incentive", "Fear of Driving", "Nervous when a passenger",
   "Withdraw from others", "Poor appetite", "Loss of weight",
   "Decrease sex drive", "Fatigue/low energy", "Short-tempered",
-  "Spousal arguments", "Over-react to small things", "Excessive worry", "Suicidal thoughts",
+  "Spousal arguments", "Over-react to small things", "Excessive worry", "Suicidal thought",
 ];
 
 export const LAW_FIRMS = ["Smith & Associates LLP", "Johnson Legal Group", "Williams & Partners", "Brown Law Firm", "Davis & Co. Legal"];
