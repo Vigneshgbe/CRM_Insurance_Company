@@ -1,8 +1,5 @@
 import { Router } from 'express';
 import { authenticate } from '../middlewares/auth.middleware';
-import ocfPdfRoutes from './ocf-pdf.routes';
-import app from '../server';
-
 
 import { login } from '../controllers/auth.controller';
 
@@ -31,15 +28,13 @@ import {
   getPortalCases, getPortalDocuments, getPortalStatusHistory,
 } from '../controllers/misc.controller';
 import { getOcfFormData, saveOcfFormData, getOcfPrefill } from '../controllers/ocf.controller';
+import { generateOcfPdf } from '../controllers/ocf-pdf.controller';
 import {
   listEditorDocuments, getEditorDocument,
   createEditorDocument, updateEditorDocument, deleteEditorDocument,
 } from '../controllers/editor-documents.controller';
 
 const router = Router();
-
-// inside where routes are registered:
-app.use('/api/cases', ocfPdfRoutes);
 
 // Public
 router.post('/auth/login', login);
@@ -137,10 +132,13 @@ router.post('/cases/:caseId/initial-interview', saveInitialInterview);
 router.get('/cases/:caseId/accident-details',  getAccidentDetails);
 router.post('/cases/:caseId/accident-details', saveAccidentDetails);
 
-// OCF Forms
+// OCF Forms (data save/load)
 router.get('/cases/:caseId/ocf/prefill',      getOcfPrefill);
 router.get('/cases/:caseId/ocf/:formNumber',  getOcfFormData);
 router.post('/cases/:caseId/ocf/:formNumber', saveOcfFormData);
+
+// OCF PDF generation — fills real government PDF template and returns download
+router.post('/cases/:caseId/ocf/:formNumber/generate', generateOcfPdf);
 
 // Users
 router.get   ('/users',                  getUsers);
