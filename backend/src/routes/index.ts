@@ -1,5 +1,8 @@
 import { Router } from 'express';
 import { authenticate } from '../middlewares/auth.middleware';
+import ocfPdfRoutes from './ocf-pdf.routes';
+import app from '../server';
+
 
 import { login } from '../controllers/auth.controller';
 
@@ -34,6 +37,8 @@ import {
 } from '../controllers/editor-documents.controller';
 
 const router = Router();
+
+app.use('/api/cases', ocfPdfRoutes);
 
 // Public
 router.post('/auth/login', login);
