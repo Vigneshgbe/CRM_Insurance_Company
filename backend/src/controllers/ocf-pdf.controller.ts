@@ -379,15 +379,16 @@ async function getCasePrefillData(caseId: string): Promise<Record<string, string
       cl.email,
       cid.driver_license     AS driverLicenseNo,
       cid.ohip_number        AS ohipNumber,
-      cnf.mva_company        AS insCompanyName,
-      cnf.adjuster_name      AS insAdjuster,
-      cnf.mva_address        AS insAddress,
-      cnf.mva_city           AS insCity,
-      cnf.mva_postal         AS insPostal,
-      cnf.mva_phone          AS insPhone,
-      cnf.mva_fax            AS insFax,
-      cnf.claim_no           AS policyNumber,
-      cnf.policy_no          AS insPolicyNo,
+      -- Insurance: try case_no_fault first, fallback to case_insurance_first_party
+      COALESCE(cnf.mva_company,   ifp.insurance_company) AS insCompanyName,
+      COALESCE(cnf.adjuster_name, ifp.adjuster_name)     AS insAdjuster,
+      COALESCE(cnf.mva_address,   ifp.address)           AS insAddress,
+      COALESCE(cnf.mva_city,      ifp.city)              AS insCity,
+      COALESCE(cnf.mva_postal,    ifp.postal_code)       AS insPostal,
+      COALESCE(cnf.mva_phone,     ifp.adjuster_phone)    AS insPhone,
+      COALESCE(cnf.mva_fax,       ifp.adjuster_fax)      AS insFax,
+      COALESCE(cnf.claim_no,      ifp.claim_no)          AS policyNumber,
+      COALESCE(cnf.policy_no,     ifp.policy_no)         AS insPolicyNo,
       emp.employer_name      AS emp1Name,
       emp.address            AS emp1Address,
       emp.city               AS emp1City,
@@ -405,6 +406,7 @@ async function getCasePrefillData(caseId: string): Promise<Record<string, string
     LEFT JOIN clients cl              ON ca.client_id = cl.id
     LEFT JOIN case_client_id_docs cid ON ca.id = cid.case_id
     LEFT JOIN case_no_fault cnf       ON ca.id = cnf.case_id
+    LEFT JOIN case_insurance_first_party ifp ON ca.id = ifp.case_id
     LEFT JOIN case_employers emp      ON ca.id = emp.case_id AND emp.employer_order = 1
     LEFT JOIN case_medical_hospital cmh ON ca.id = cmh.case_id
     LEFT JOIN case_medical_providers cmp ON ca.id = cmp.case_id AND cmp.provider_order = 1
