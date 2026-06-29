@@ -112,10 +112,12 @@ export default function CaseDetail() {
       benefitsClaiming: "No", irbNonEarnerDue: "No",
       clientInitials: "", clientStreet: "", clientCity: "",
       clientState: "", clientZip: "", clientCountry: "Canada", clientMobile: "",
+      clientFirstName: "",
+      clientLastName: "",
     },
   });
 
-  // ── Load case + referrers in parallel ────────────────────────────────────
+  // ── Load case + referrers in parallel ────────────────────────────────────────────
   useEffect(() => {
     if (!caseId) return;
     const headers = { Authorization: `Bearer ${getToken()}` };
@@ -128,7 +130,6 @@ export default function CaseDetail() {
         if (cData) {
           setCaseData(cData);
           setSignatureUrl(cData.clientSignatureUrl || "");
-          // Populate form with real data
           reset({
             fileNo:            cData.fileNo            || "",
             fileStatus:        cData.fileStatus        || "Active",
@@ -152,6 +153,8 @@ export default function CaseDetail() {
             clientZip:         cData.clientZip         || "",
             clientCountry:     cData.clientCountry     || "Canada",
             clientMobile:      cData.clientMobile      || "",
+            clientFirstName:   cData.client?.firstName || cData.firstName || "",
+            clientLastName:    cData.client?.lastName  || cData.lastName  || "",
           });
         }
         setReferrers(Array.isArray(refs) ? refs : []);
@@ -160,7 +163,7 @@ export default function CaseDetail() {
       .finally(() => setFetching(false));
   }, [caseId]);
 
-  // ── Save case via real PUT ────────────────────────────────────────────────
+  // ── Save case via real PUT ────────────────────────────────────────────
   const onSave = async (data: any) => {
     setSaving(true);
     try {
@@ -182,7 +185,6 @@ export default function CaseDetail() {
   };
 
   const onCancel = () => {
-    // Reset form back to current caseData
     if (caseData) {
       reset({
         fileNo:            caseData.fileNo            || "",
@@ -207,6 +209,8 @@ export default function CaseDetail() {
         clientZip:         caseData.clientZip         || "",
         clientCountry:     caseData.clientCountry     || "Canada",
         clientMobile:      caseData.clientMobile      || "",
+        clientFirstName:   caseData.client?.firstName || caseData.firstName || "",
+        clientLastName:    caseData.client?.lastName  || caseData.lastName  || "",
       });
     }
     setEditing(false);
@@ -254,13 +258,10 @@ export default function CaseDetail() {
           {!editing ? (
             <div className="flex items-start justify-between gap-4">
               <div className="min-w-0 flex-1">
-                {/* Client Name */}
                 <h2 className="text-xl font-bold">
                   {caseData.client?.firstName || caseData.firstName || ""}{" "}
                   {caseData.client?.lastName  || caseData.lastName  || ""}
                 </h2>
-
-                {/* Row 1: File No, Status, DOL, Limitation */}
                 <div className="flex flex-wrap items-center gap-x-3 gap-y-1 mt-2 text-sm">
                   <span className="font-semibold text-foreground">{caseData.fileNo}</span>
                   <Badge className={cn("text-xs", statusColor[caseData.fileStatus] || "bg-secondary")}>
@@ -277,8 +278,6 @@ export default function CaseDetail() {
                     Limitation: <span className="font-medium">{formatDate(caseData.limitationDate) || "—"}</span>
                   </span>
                 </div>
-
-                {/* Row 2: Clerk, Secretary, Referred, Initials */}
                 <div className="flex flex-wrap gap-x-4 gap-y-1 mt-1 text-xs text-muted-foreground">
                   <span>Clerk: <span className="text-foreground">{caseData.clerkAssigned || "—"}</span></span>
                   <span>Secretary: <span className="text-foreground">{caseData.secretary || "—"}</span></span>
@@ -287,8 +286,6 @@ export default function CaseDetail() {
                     <span>Initials: <span className="text-foreground font-medium">{caseData.clientInitials}</span></span>
                   )}
                 </div>
-
-                {/* Row 3: Address — always shown, dash if empty */}
                 <div className="mt-1 text-xs text-muted-foreground flex items-start gap-1">
                   <span className="shrink-0">Address:</span>
                   <span className="text-foreground">
@@ -298,8 +295,6 @@ export default function CaseDetail() {
                       : "—"}
                   </span>
                 </div>
-
-                {/* Row 4: Mobile — always shown, dash if empty */}
                 <div className="mt-1 text-xs text-muted-foreground flex items-center gap-1">
                   <Phone className="h-3 w-3 shrink-0" />
                   <span>Mobile:</span>
@@ -315,7 +310,6 @@ export default function CaseDetail() {
                   )}
                 </div>
               </div>
-
               <Button variant="outline" size="sm" onClick={() => setEditing(true)} className="shrink-0">
                 <Pencil className="h-3.5 w-3.5 mr-1" /> Edit
               </Button>
@@ -332,6 +326,13 @@ export default function CaseDetail() {
                     <Save className="h-3.5 w-3.5 mr-1" /> {saving ? "Saving..." : "Save"}
                   </Button>
                 </div>
+              </div>
+
+              {/* Client Name */}
+              <div className="bg-muted/50 px-3 py-1.5 rounded text-xs font-semibold text-foreground mb-3">Client Name</div>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mb-4">
+                <div><Label className="text-xs">First Name</Label><Input {...register("clientFirstName")} className="h-8 text-xs mt-1" /></div>
+                <div><Label className="text-xs">Last Name</Label><Input {...register("clientLastName")} className="h-8 text-xs mt-1" /></div>
               </div>
 
               {/* File Information */}

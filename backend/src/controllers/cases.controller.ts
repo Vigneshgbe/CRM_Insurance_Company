@@ -173,10 +173,12 @@ export async function updateCase(req: Request, res: Response): Promise<void> {
     mvaClientFault, benefitsClaiming, irbNonEarnerDue, thirdPartyLawyer, tortFileNo,
     closedFileNo, clientInitials, clientSignatureUrl, clientStreet, clientCity,
     clientState, clientZip, clientCountry, clientMobile, abCounsel, tortLawFirm, tortCounsel,
+    clientFirstName, clientLastName,
   } = req.body;
   try {
-    const [oldRows] = await pool.query('SELECT file_status FROM cases WHERE id = ?', [caseId]) as any[];
+    const [oldRows] = await pool.query('SELECT file_status, client_id FROM cases WHERE id = ?', [caseId]) as any[];
     const oldStatus = (oldRows as any[])[0]?.file_status;
+    const clientId  = (oldRows as any[])[0]?.client_id;
 
     await pool.query(
       `UPDATE cases SET file_status=?, case_type=?, date_of_loss=?, open_date=?,
@@ -194,6 +196,27 @@ export async function updateCase(req: Request, res: Response): Promise<void> {
        clientSignatureUrl||'', clientStreet||'', clientCity||'', clientState||'', clientZip||'',
        clientCountry||'Canada', clientMobile||'', abCounsel||'', tortLawFirm||'', tortCounsel||'', caseId]
     );
+
+    // ── Update client name in clients table if provided ───────────────────
+    if (clientId && (clientFirstName !== undefined || clientLastName !== undefined)) {
+      const updates: string[] = [];
+      const vals: any[] = [];
+      if (clientFirstName !== undefined) {
+        updates.push('first_name = ?');
+        vals.push(String(clientFirstName).trim());
+      }
+      if (clientLastName !== undefined) {
+        updates.push('last_name = ?');
+        vals.push(String(clientLastName).trim());
+      }
+      if (updates.length > 0) {
+        vals.push(clientId);
+        await pool.query(
+          `UPDATE clients SET ${updates.join(', ')} WHERE id = ?`,
+          vals
+        );
+      }
+    }
 
     if (oldStatus && oldStatus !== fileStatus) {
       const user = (req as any).user?.name || 'System';
