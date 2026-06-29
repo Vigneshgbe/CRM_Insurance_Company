@@ -62,12 +62,41 @@ export async function saveEmployment(req: Request, res: Response): Promise<void>
   try {
     await conn.beginTransaction();
 
-    // Main employment record
+    // Main employment record — save employment_type AND all status checkbox columns
+    // status_* columns populated by EmploymentTab checkboxes in the future;
+    // for now write 0 if not supplied so the row exists for prefill
     await conn.query(
-      `INSERT INTO case_employment (id, case_id, employment_type)
-       VALUES (UUID(),?,?)
-       ON DUPLICATE KEY UPDATE employment_type=VALUES(employment_type)`,
-      [caseId, b.employmentType || '']
+      `INSERT INTO case_employment
+        (id, case_id, employment_type,
+         status_employed, status_self_employed, status_unemployed_26wks,
+         status_written_contract, status_ei_benefits, status_unemployed,
+         status_retired, status_student, status_caregiver, loss_of_income_claim)
+       VALUES (UUID(),?,?, ?,?,?,?,?,?,?,?,?,?)
+       ON DUPLICATE KEY UPDATE
+         employment_type=VALUES(employment_type),
+         status_employed=VALUES(status_employed),
+         status_self_employed=VALUES(status_self_employed),
+         status_unemployed_26wks=VALUES(status_unemployed_26wks),
+         status_written_contract=VALUES(status_written_contract),
+         status_ei_benefits=VALUES(status_ei_benefits),
+         status_unemployed=VALUES(status_unemployed),
+         status_retired=VALUES(status_retired),
+         status_student=VALUES(status_student),
+         status_caregiver=VALUES(status_caregiver),
+         loss_of_income_claim=VALUES(loss_of_income_claim)`,
+      [
+        caseId, b.employmentType || '',
+        b.statusEmployed      ? 1 : 0,
+        b.statusSelfEmployed  ? 1 : 0,
+        b.statusUnemployed26  ? 1 : 0,
+        b.statusContract      ? 1 : 0,
+        b.statusEI            ? 1 : 0,
+        b.statusUnemployed    ? 1 : 0,
+        b.statusRetired       ? 1 : 0,
+        b.statusStudent       ? 1 : 0,
+        b.statusCaregiver     ? 1 : 0,
+        b.lossOfIncome        ? 1 : 0,
+      ]
     );
 
     // Full-time employer (employer_order = 1)

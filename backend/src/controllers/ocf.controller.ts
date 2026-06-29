@@ -182,7 +182,8 @@ export async function getOcfPrefill(req: Request, res: Response): Promise<void> 
 
     // ── 13. case_employment (tinyint status columns) + case_employers ─────────
     const [empMainRows] = await pool.query(
-      `SELECT status_employed, status_self_employed, status_unemployed_26wks,
+      `SELECT employment_type,
+              status_employed, status_self_employed, status_unemployed_26wks,
               status_written_contract, status_ei_benefits, status_unemployed,
               status_retired, status_student, status_caregiver, loss_of_income_claim
        FROM case_employment WHERE case_id = ? LIMIT 1`, [caseId]
@@ -191,7 +192,7 @@ export async function getOcfPrefill(req: Request, res: Response): Promise<void> 
 
     const [empRows] = await pool.query(
       `SELECT employer_order, employer_name, address, city, postal_code, phone, fax,
-              job_title, salary_wages, hours_per_week, length_of_employment, last_day_worked
+              job_title, salary_wages, hours_per_week
        FROM case_employers WHERE case_id = ? ORDER BY employer_order ASC LIMIT 3`, [caseId]
     ) as any[];
     const empList = Array.isArray(empRows) ? empRows : [];
@@ -359,8 +360,7 @@ export async function getOcfPrefill(req: Request, res: Response): Promise<void> 
       empMap[`emp${i}_occupation`]  = s(e.job_title);
       empMap[`emp${i}_salary`]      = safeNum(e.salary_wages);
       empMap[`emp${i}_hoursPerWeek`]= safeNum(e.hours_per_week);
-      empMap[`emp${i}_length`]      = s(e.length_of_employment);
-      empMap[`emp${i}_lastDay`]     = d(e.last_day_worked);
+      // emp*_length and emp*_lastDay omitted: those columns don't exist in case_employers
     }
 
     res.json({
