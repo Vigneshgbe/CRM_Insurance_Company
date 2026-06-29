@@ -1861,10 +1861,7 @@ export default function TemplateFillModal({ templateId, templateName, caseId, on
       .then(r=>r.ok?r.json():[]).then(d=>setAllCases(Array.isArray(d)?d:[]));
   }, []);
 
-// Auto-fill from selected case
-  // Calls /ocf/prefill — joins cases, clients, case_no_fault,
-  // case_insurance_first_party, case_initial_interview, case_accident_details,
-  // case_third_party, case_third_party_insurance
+// ── Auto-fill from selected case ─────────────────────────────────────────────
   useEffect(() => {
     if (!selectedCaseId) return;
 
@@ -1876,147 +1873,80 @@ export default function TemplateFillModal({ templateId, templateName, caseId, on
         return res.json();
       })
       .then((r: Record<string, any>) => {
-        // Normalise a date value of any format → YYYY-MM-DD for <input type="date">
+        // Normalise date → YYYY-MM-DD for <input type="date">
         const fd = (v: any): string => {
           if (!v) return '';
           const str = String(v).trim();
           if (!str) return '';
-          // Already YYYY-MM-DD (ISO)
           if (/^\d{4}-\d{2}-\d{2}/.test(str)) return str.slice(0, 10);
-          // DD/MM/YYYY
           const a = str.split('/');
           if (a.length === 3 && a[2].length === 4)
             return `${a[2]}-${a[1].padStart(2,'0')}-${a[0].padStart(2,'0')}`;
           return str;
         };
 
-        // Safe string — never undefined/null
-        const g = (key: string, ...fallbacks: string[]): string => {
-          for (const k of [key, ...fallbacks]) {
+        // Safe string getter with fallbacks
+        const g = (...keys: string[]): string => {
+          for (const k of keys) {
             const v = r[k];
             if (v !== null && v !== undefined && String(v).trim() !== '') return String(v).trim();
           }
           return '';
         };
 
-        const map: Record<string, string> = {
-          // ── Identity ────────────────────────────────────────────────────────
-          firstName:            g('firstName', 'first_name'),
-          lastName:             g('lastName', 'last_name'),
-          initial:              g('initial'),
-          gender:               g('gender'),
-          maritalStatus:        g('maritalStatus', 'marital_status'),
-          dependants:           g('dependants'),
-          dateOfBirth:          fd(g('dateOfBirth', 'birthDate', 'date_of_birth', 'dob')),
-          fullName:             g('fullName', 'full_name'),
-          firstNameInitial:     g('firstNameInitial'),
+        // ── Step 1: Start with ALL keys from backend response directly ──────────
+        // The backend now returns keys that match MatrixIntakeForm field names exactly.
+        // Copy everything non-empty directly so nothing is silently dropped.
+        const filled: Record<string, string> = {};
+        for (const [k, v] of Object.entries(r)) {
+          if (v !== null && v !== undefined && String(v).trim() !== '') {
+            filled[k] = String(v).trim();
+          }
+        }
 
-          // ── Contact ─────────────────────────────────────────────────────────
-          address:              g('address'),
-          city:                 g('city'),
-          province:             g('province'),
-          postalCode:           g('postalCode', 'postCode', 'post_code', 'postal_code'),
-          homePhone:            g('homePhone', 'homeTelephone', 'home_phone'),
-          workPhone:            g('workPhone', 'workTelephone', 'work_phone'),
-          cellPhone:            g('cellPhone', 'cell_phone'),
-          phone:                g('phone', 'cellPhone', 'cell_phone', 'homePhone', 'home_phone'),
-          email:                g('email'),
+        // ── Step 2: Fix date formats (backend returns YYYY-MM-DD from Date objects) ──
+        const dateKeys = [
+          'dateOfBirth','dateOfAccident','dateOfMva','dateOfMVA',
+          'admissionDate','dischargeDate',
+          'emp1_lastDay','emp2_lastDay','emp3_lastDay',
+          'cg1_dob','cg2_dob','cg3_dob','cg4_dob','cg5_dob','cg6_dob',
+        ];
+        for (const k of dateKeys) {
+          if (filled[k]) filled[k] = fd(filled[k]);
+        }
 
-          // ── Case ────────────────────────────────────────────────────────────
-          fileNo:               g('fileNo', 'file_no'),
-          dateOfAccident:       fd(g('dateOfAccident', 'date_of_loss', 'dateOfLoss')),
-          dateOfMVA:            fd(g('dateOfMva', 'dateOfMVA', 'date_of_loss')),
-          referredBy:           g('referredBy', 'referred_by'),
-          interviewedBy:        g('interviewedBy', 'interviewed_by', 'clerkAssigned', 'clerk_assigned'),
-          clerkAssigned:        g('clerkAssigned', 'clerk_assigned'),
+        // ── Step 3: Add aliases for fields that MatrixIntakeForm uses
+        //    under different key names than what the backend returns ──────────────
 
-          // ── First-party insurance ────────────────────────────────────────────
-          claimNumber:          g('claimNumber', 'claim_no', 'claimNo'),
-          policyNumber:         g('policyNumber', 'policy_no', 'policyNo'),
-          insurerName:          g('insurerName', 'insurer_name', 'insuranceCompanyName'),
-          insurerCity:          g('insurerCity', 'insCity'),
-          insurerAddress:       g('insurerAddress', 'insAddress'),
-          adjusterName:         g('adjusterName', 'adjuster_name'),
-          adjusterLast:         g('adjusterLast'),
-          adjusterFirst:        g('adjusterFirst'),
-          adjusterPhone:        g('adjusterPhone', 'adjuster_phone'),
-          adjusterFax:          g('adjusterFax', 'adjuster_fax'),
-          adjusterExt:          g('adjusterExt'),
-          namedInsured:         g('namedInsured', 'named_insured'),
-          policyHolderLast:     g('policyHolderLast'),
-          policyHolderFirst:    g('policyHolderFirst'),
-          policyHolderName:     g('namedInsured', 'named_insured', 'policyHolderName'),
-          // Matrix/OCF insurance block keys
-          fp_insurerName:       g('insurerName', 'insuranceCompanyName'),
-          fp_insurerCity:       g('insurerCity'),
-          fp_insurerAddress:    g('insurerAddress'),
-          fp_adjuster:          g('adjusterName', 'adjuster_name'),
-          fp_phone:             g('adjusterPhone'),
-          fp_fax:               g('adjusterFax'),
-          fp_claimNo:           g('claimNumber', 'claim_no'),
-          fp_policyNo:          g('policyNumber', 'policy_no'),
-          fp_policyHolder:      g('namedInsured', 'named_insured'),
-          fp_autoMake:          g('autoMake', 'auto_make'),
-          fp_autoModel:         g('autoModel', 'auto_model'),
-          fp_autoYear:          g('autoYear', 'auto_year'),
-          fp_plateNo:           g('plateNumber', 'plate_number'),
+        // MatrixIntake uses "cellPhone", backend returns "cellPhone" directly ✓
+        // MatrixIntake "wentToHospital" shown as Radio Yes/No — backend returns "No"/"Yes" ✓
+        // MatrixIntake "ambulanceRequired" — backend returns "No"/"Yes" ✓
 
-          // ── Third party ───────────────────────────────────────────────────────
-          tp_driverName:        g('tpDriverName'),
-          tp_driverLicenseNo:   g('tpDriverLicenseNo'),
-          tp_driverPhone:       g('tpDriverPhone'),
-          tp_driverAddress:     g('tpDriverAddress'),
-          tp_autoMake:          g('tpAutoMake'),
-          tp_autoModel:         g('tpAutoModel'),
-          tp_autoYear:          g('tpAutoYear'),
-          tp_plateNo:           g('tpPlateNo'),
-          tp_insurerName:       g('tpInsurerName'),
-          tp_adjuster:          g('tpAdjusterName'),
-          tp_phone:             g('tpPhone'),
-          tp_fax:               g('tpFax'),
-          tp_claimNo:           g('tpClaimNo'),
-          tp_policyNo:          g('tpPolicyNo'),
+        // Police fields — MatrixIntake uses these keys in Accident Details section:
+        if (!filled.policeDepartment && g('policeCentre')) filled.policeDepartment = g('policeCentre');
+        if (!filled.incidentNo && g('policeIncidentNo')) filled.incidentNo = g('policeIncidentNo');
+        if (!filled.officerName && g('policeOfficer')) filled.officerName = g('policeOfficer');
+        if (!filled.badgeNo && g('policeBadgeNo')) filled.badgeNo = g('policeBadgeNo');
 
-          // ── Accident details ──────────────────────────────────────────────────
-          accidentLocation:     g('accidentLocation'),
-          accidentDescription:  g('accidentDescription'),
-          accidentStreet:       g('accidentStreet'),
-          accidentIntersection: g('accidentIntersection'),
-          accidentCity:         g('accidentCity'),
-          accidentProvince:     g('accidentProvince'),
-          timeOfAccident:       g('timeOfAccident'),
-          timeOfMVA:            g('timeOfMVA', 'timeOfAccident'),
+        // MatrixIntake "streetAddress" = full street, backend has "address"
+        if (!filled.streetAddress && filled.address) filled.streetAddress = filled.address;
 
-          // ── Matrix interview fields ───────────────────────────────────────────
-          conflictChecked:      g('conflictChecked'),
-          conflictFind:         g('conflictFind'),
-          speaksEnglish:        g('speaksEnglish'),
-          needsInterpreter:     g('needsInterpreter'),
-          bornInCanada:         g('bornInCanada'),
-          seatBelted:           g('seatBelted'),
-          accidentAtWork:       g('accidentAtWork'),
-          policeReported:       g('policeReported'),
-          benefitChoice:        g('benefitChosen', 'benefitChoice', 'benefit_chosen'),
-          benefitElection:      g('benefitChosen', 'benefitChoice', 'benefit_chosen'),
+        // MatrixIntake "benefitChoice" radio — backend returns "benefitChosen"
+        if (!filled.benefitChoice && filled.benefitChosen) filled.benefitChoice = filled.benefitChosen;
+        if (!filled.benefitElection && filled.benefitChosen) filled.benefitElection = filled.benefitChosen;
 
-          // ── Signature pre-fill ────────────────────────────────────────────────
-          sigName:     g('fullName', 'sigName'),
-          appSigName:  g('fullName', 'appSigName'),
-          decLastName:  g('lastName', 'last_name'),
-          decFirstName: g('firstName', 'first_name'),
-        };
+        // MatrixIntake "authRE" — ensure it's set
+        if (!filled.authRE && filled.fullName && filled.fileNo) {
+          filled.authRE = `${filled.fullName} — ${filled.fileNo}`;
+        }
 
-        // Only apply non-empty values; don't overwrite what user already typed
-        const filled = Object.fromEntries(
-          Object.entries(map).filter(([, v]) => v !== '')
-        );
-        const keys = new Set(Object.keys(filled));
+        // ── Step 4: Apply to state ─────────────────────────────────────────────
+        const filledKeys = new Set(Object.keys(filled));
         setFields(prev => ({ ...prev, ...filled }));
-        setAutoFilled(keys);
+        setAutoFilled(filledKeys);
       })
       .catch(err => {
         console.error('[OCF prefill error]', err);
-        // Do NOT silently swallow — show in console so it's visible in DevTools
       });
   }, [selectedCaseId]);
   
