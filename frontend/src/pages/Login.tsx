@@ -54,7 +54,7 @@ export default function Login() {
             className="h-20 w-20 mx-auto object-contain"
           />
           <div>
-            <h1 className="text-xl font-bold text-foreground">Hypernova CRM</h1>
+            <h1 className="text-xl font-bold text-foreground">Matrix Legal Services</h1>
             <p className="text-sm text-muted-foreground">Sign in to your account</p>
           </div>
         </CardHeader>
