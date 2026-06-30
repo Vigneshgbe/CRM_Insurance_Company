@@ -149,4 +149,19 @@ export async function sendAutoNotification(params: {
       sentBy, triggerType,
     ]
   );
+
+  // ── This was missing — sendCaseEmail and logManualEmail already insert into
+  //    activities, but this auto-notification path (status change, activity
+  //    added) did not, which is why those emails appeared in email_log but
+  //    not in the Activities tab's Email filter. Fixed additively here. ──
+  await pool.query(
+    `INSERT INTO activities (id, case_id, date, time, type, regarding, details, record_manager, company_group)
+     VALUES (?,?,CURDATE(),TIME(NOW()),?,?,?,?,?)`,
+    [
+      generateId(), caseId, 'Email',
+      subject,
+      `Email ${result.success ? 'sent' : 'failed'} to ${to}`,
+      sentBy, 'Internal',
+    ]
+  );
 }
