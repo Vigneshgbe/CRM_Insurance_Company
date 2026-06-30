@@ -112,11 +112,11 @@ export default function CaseDetail() {
       benefitsClaiming: "No", irbNonEarnerDue: "No",
       clientInitials: "", clientStreet: "", clientCity: "",
       clientState: "", clientZip: "", clientCountry: "Canada", clientMobile: "",
-      clientFirstName: "", clientLastName: "",
+      clientFirstName: "", clientLastName: "", clientEmail: "", caseType: "",
     },
   });
 
-  // ── Load case + referrers in parallel ────────────────────────────────────────────
+  // ── Load case + referrers in parallel ────────────────────────────────
   useEffect(() => {
     if (!caseId) return;
     const headers = { Authorization: `Bearer ${getToken()}` };
@@ -154,6 +154,8 @@ export default function CaseDetail() {
             clientMobile:      cData.clientMobile      || "",
             clientFirstName:   cData.client?.firstName || "",
             clientLastName:    cData.client?.lastName  || "",
+            clientEmail:       cData.client?.email     || "",
+            caseType:          cData.caseType          || "",
           });
         }
         setReferrers(Array.isArray(refs) ? refs : []);
@@ -162,7 +164,7 @@ export default function CaseDetail() {
       .finally(() => setFetching(false));
   }, [caseId]);
 
-  // ── Save case via real PUT ────────────────────────────────────────────
+  // ── Save case via real PUT ────────────────────────────────────
   const onSave = async (data: any) => {
     setSaving(true);
     try {
@@ -210,6 +212,8 @@ export default function CaseDetail() {
         clientMobile:      caseData.clientMobile      || "",
         clientFirstName:   caseData.client?.firstName || "",
         clientLastName:    caseData.client?.lastName  || "",
+        clientEmail:       caseData.client?.email     || "",
+        caseType:          caseData.caseType          || "",
       });
     }
     setEditing(false);
@@ -329,7 +333,7 @@ export default function CaseDetail() {
 
               {/* Client Name */}
               <div className="bg-muted/50 px-3 py-1.5 rounded text-xs font-semibold text-foreground mb-3">Client Name</div>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mb-4">
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-3 mb-4">
                 <div>
                   <Label className="text-xs">First Name</Label>
                   <Input {...register("clientFirstName")} className="h-8 text-xs mt-1" />
@@ -337,6 +341,10 @@ export default function CaseDetail() {
                 <div>
                   <Label className="text-xs">Last Name</Label>
                   <Input {...register("clientLastName")} className="h-8 text-xs mt-1" />
+                </div>
+                <div>
+                  <Label className="text-xs">Email</Label>
+                  <Input {...register("clientEmail")} type="email" className="h-8 text-xs mt-1" />
                 </div>
               </div>
 
@@ -350,6 +358,15 @@ export default function CaseDetail() {
                     <Select value={field.value} onValueChange={field.onChange}>
                       <SelectTrigger className="h-8 text-xs mt-1"><SelectValue /></SelectTrigger>
                       <SelectContent>{FILE_STATUSES.map((s) => <SelectItem key={s} value={s}>{s}</SelectItem>)}</SelectContent>
+                    </Select>
+                  )} />
+                </div>
+                <div>
+                  <Label className="text-xs">Case Type</Label>
+                  <Controller name="caseType" control={control} render={({ field }) => (
+                    <Select value={field.value} onValueChange={field.onChange}>
+                      <SelectTrigger className="h-8 text-xs mt-1"><SelectValue placeholder="Select case type..." /></SelectTrigger>
+                      <SelectContent>{CASE_TYPES.map((c) => <SelectItem key={c} value={c}>{c}</SelectItem>)}</SelectContent>
                     </Select>
                   )} />
                 </div>

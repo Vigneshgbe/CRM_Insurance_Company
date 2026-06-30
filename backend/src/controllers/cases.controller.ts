@@ -174,7 +174,7 @@ export async function updateCase(req: Request, res: Response): Promise<void> {
     mvaClientFault, benefitsClaiming, irbNonEarnerDue, thirdPartyLawyer, tortFileNo,
     closedFileNo, clientInitials, clientSignatureUrl, clientStreet, clientCity,
     clientState, clientZip, clientCountry, clientMobile, abCounsel, tortLawFirm, tortCounsel,
-    clientFirstName, clientLastName,
+    clientFirstName, clientLastName, clientEmail,
   } = req.body;
 
   try {
@@ -200,7 +200,7 @@ export async function updateCase(req: Request, res: Response): Promise<void> {
     );
 
     // ── Update client name if provided ────────────────────────────────────────
-    if (clientId && (clientFirstName !== undefined || clientLastName !== undefined)) {
+    if (clientId && (clientFirstName !== undefined || clientLastName !== undefined || clientEmail !== undefined)) {
       const updates: string[] = [];
       const vals: any[] = [];
       if (clientFirstName !== undefined) {
@@ -210,6 +210,10 @@ export async function updateCase(req: Request, res: Response): Promise<void> {
       if (clientLastName !== undefined) {
         updates.push('last_name = ?');
         vals.push(String(clientLastName).trim());
+      }
+      if (clientEmail !== undefined) {
+        updates.push('email = ?');
+        vals.push(String(clientEmail).trim());
       }
       if (updates.length > 0) {
         vals.push(clientId);
@@ -236,12 +240,12 @@ export async function updateCase(req: Request, res: Response): Promise<void> {
       try {
         const [rows] = await pool.query(CASE_JOIN + ' WHERE ca.id = ?', [caseId]) as any[];
         const updatedCase = (rows as any[])[0];
-        const clientEmail = updatedCase?.c_email;
+        const notifyEmail = updatedCase?.c_email;
         const fileNo = updatedCase?.file_no;
-        if (clientEmail) {
+        if (notifyEmail) {
           await sendAutoNotification({
             caseId,
-            to: clientEmail,
+            to: notifyEmail,
             subject: `Case ${fileNo} — Status Updated to ${fileStatus}`,
             body: `Hello,\n\nYour case ${fileNo} status has been updated from "${oldStatus}" to "${fileStatus}".\n\nIf you have any questions, please contact our office.\n\nMatrix Legal Services`,
             triggerType: 'status_change',
