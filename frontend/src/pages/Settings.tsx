@@ -180,7 +180,7 @@ export default function Settings() {
         setSystemSettings(JSON.parse(stored));
       } else {
         setSystemSettings({
-          appName:     "Hypernova CRM",
+          appName:     "Padak Pvt Ltd CRM",
           companyName: "Matrix Legal Services",
           adminEmail:  "",
           timezone:    "America/Toronto",

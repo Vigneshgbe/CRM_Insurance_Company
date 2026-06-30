@@ -1,5 +1,5 @@
 // ============================================================
-// api.ts — Central API layer for Hypernova CRM
+// api.ts — Central API layer for Padak Pvt Ltd CRM
 // All calls go to http://localhost:5000/api
 // Replaces ALL mockData.ts usage
 // ============================================================
