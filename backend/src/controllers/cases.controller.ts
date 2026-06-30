@@ -1,6 +1,7 @@
 import { Request, Response } from 'express';
 import pool from '../config/database';
 import { generateId, generateFileNo, formatDate } from '../utils/helpers';
+import { sendAutoNotification } from './email.controller';
 
 function mapCase(row: any): any {
   return {
@@ -230,6 +231,27 @@ export async function updateCase(req: Request, res: Response): Promise<void> {
         `INSERT INTO status_history (id, case_id, status, date, changed_by) VALUES (?,?,?,CURDATE(),?)`,
         [generateId(), caseId, fileStatus, user]
       );
+
+      // ── NEW: auto email notification on status change (additive, never blocks save) ──
+      try {
+        const [rows] = await pool.query(CASE_JOIN + ' WHERE ca.id = ?', [caseId]) as any[];
+        const updatedCase = (rows as any[])[0];
+        const clientEmail = updatedCase?.c_email;
+        const fileNo = updatedCase?.file_no;
+        if (clientEmail) {
+          await sendAutoNotification({
+            caseId,
+            to: clientEmail,
+            subject: `Case ${fileNo} — Status Updated to ${fileStatus}`,
+            body: `Hello,\n\nYour case ${fileNo} status has been updated from "${oldStatus}" to "${fileStatus}".\n\nIf you have any questions, please contact our office.\n\nMatrix Legal Services`,
+            triggerType: 'status_change',
+            sentBy: user,
+          });
+        }
+      } catch (emailErr) {
+        // Email failure must never break the case update itself
+        console.error('[updateCase] auto-notification failed (non-fatal):', emailErr);
+      }
     }
 
     const [rows] = await pool.query(CASE_JOIN + ' WHERE ca.id = ?', [caseId]) as any[];

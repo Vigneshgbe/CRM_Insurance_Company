@@ -66,13 +66,13 @@ export async function sendCaseEmail(req: Request, res: Response): Promise<void> 
     // Also log into activities table so it shows in the existing Activities tab
     // This is an ADDITIVE insert only — does not touch any existing activities code
     await pool.query(
-      `INSERT INTO activities (id, case_id, date, time, type, regarding, details, record_manager)
-       VALUES (?,?,CURDATE(),TIME(NOW()),?,?,?,?)`,
+      `INSERT INTO activities (id, case_id, date, time, type, regarding, details, record_manager, company_group)
+       VALUES (?,?,CURDATE(),TIME(NOW()),?,?,?,?,?)`,
       [
         generateId(), caseId, 'Email',
         subject,
         `Email ${result.success ? 'sent' : 'failed'} to ${to}`,
-        sentBy,
+        sentBy, 'Internal',
       ]
     );
 
@@ -109,9 +109,9 @@ export async function logManualEmail(req: Request, res: Response): Promise<void>
     );
 
     await pool.query(
-      `INSERT INTO activities (id, case_id, date, time, type, regarding, details, record_manager)
-       VALUES (?,?,CURDATE(),TIME(NOW()),?,?,?,?)`,
-      [generateId(), caseId, 'Email', subject, `Email manually logged to ${to}`, sentBy]
+      `INSERT INTO activities (id, case_id, date, time, type, regarding, details, record_manager, company_group)
+       VALUES (?,?,CURDATE(),TIME(NOW()),?,?,?,?,?)`,
+      [generateId(), caseId, 'Email', subject, `Email manually logged to ${to}`, sentBy, 'Internal']
     );
 
     res.status(201).json({ success: true, id });
