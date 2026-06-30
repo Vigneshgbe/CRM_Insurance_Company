@@ -6,6 +6,7 @@ import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/lib/auth";
+import matrixLogo from "@/assets/matrix-logo.png";
 
 export default function Login() {
   const [email, setEmail] = useState("");
@@ -46,9 +47,16 @@ export default function Login() {
   return (
     <div className="min-h-screen flex items-center justify-center bg-surface p-4">
       <Card className="w-full max-w-sm">
-        <CardHeader className="text-center pb-4">
-          <h1 className="text-xl font-bold text-foreground">Hypernova CRM</h1>
-          <p className="text-sm text-muted-foreground">Sign in to your account</p>
+        <CardHeader className="text-center pb-4 space-y-3">
+          <img
+            src={matrixLogo}
+            alt="Matrix Legal Services"
+            className="h-20 w-20 mx-auto object-contain"
+          />
+          <div>
+            <h1 className="text-xl font-bold text-foreground">Hypernova CRM</h1>
+            <p className="text-sm text-muted-foreground">Sign in to your account</p>
+          </div>
         </CardHeader>
         <CardContent>
           <form onSubmit={handleSubmit} className="space-y-4">
