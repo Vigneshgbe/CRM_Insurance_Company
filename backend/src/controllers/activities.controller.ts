@@ -1,6 +1,7 @@
 import { Request, Response } from 'express';
 import pool from '../config/database';
 import { generateId, formatDate } from '../utils/helpers';
+import { sendAutoNotification } from './email.controller';
 
 function mapActivity(row: any) {
   return {
@@ -48,7 +49,41 @@ export async function createActivity(req: Request, res: Response): Promise<void>
       [id, caseId, date||new Date().toISOString().slice(0,10), time||'', type||'Note', regarding||'', details||'', manager, companyGroup||'Internal']
     );
     const [rows] = await pool.query('SELECT * FROM activities WHERE id = ?', [id]) as any[];
-    res.status(201).json(mapActivity((rows as any[])[0]));
+    const newActivity = (rows as any[])[0];
+
+    // ── NEW: auto email notification when a new activity is added ──────────────
+    // GUARD: skip if type is 'Email' or 'Note' — Email activities are already the
+    // result of an email action (would cause a loop), and Notes are excluded from
+    // this tab entirely (per getActivitiesByCaseId filter), so notifying on them
+    // would be inconsistent with what staff actually see.
+    if (type && type !== 'Email' && type !== 'Note') {
+      try {
+        const [caseRows] = await pool.query(
+          `SELECT ca.file_no, cl.email as client_email
+           FROM cases ca LEFT JOIN clients cl ON ca.client_id = cl.id
+           WHERE ca.id = ?`,
+          [caseId]
+        ) as any[];
+        const caseInfo = (caseRows as any[])[0];
+        const clientEmail = caseInfo?.client_email;
+        const fileNo = caseInfo?.file_no;
+        if (clientEmail) {
+          await sendAutoNotification({
+            caseId,
+            to: clientEmail,
+            subject: `Case ${fileNo} — New ${type}: ${regarding || ''}`.trim(),
+            body: `Hello,\n\nA new ${type} was added to your case ${fileNo}.\n\n${regarding ? `Regarding: ${regarding}\n` : ''}${details ? `Details: ${details}\n` : ''}\nMatrix Legal Services`,
+            triggerType: 'activity_added',
+            sentBy: manager,
+          });
+        }
+      } catch (emailErr) {
+        // Email failure must never break activity creation
+        console.error('[createActivity] auto-notification failed (non-fatal):', emailErr);
+      }
+    }
+
+    res.status(201).json(mapActivity(newActivity));
   } catch (err) { res.status(500).json({ error: 'Server error' }); }
 }
 
