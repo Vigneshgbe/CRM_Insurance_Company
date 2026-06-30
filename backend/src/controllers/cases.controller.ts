@@ -259,6 +259,69 @@ export async function updateCase(req: Request, res: Response): Promise<void> {
   } catch (err) { console.error(err); res.status(500).json({ error: 'Server error' }); }
 }
 
+// ── NEW: matches StatusTab.tsx's POST /api/cases/:caseId/status ────────────
+// This route never existed before (was 404ing). Pre-existing bug, unrelated
+// to the email feature, fixed here since it shares the same status-change
+// + email-notification logic already built into updateCase above.
+export async function updateCaseStatus(req: Request, res: Response): Promise<void> {
+  const caseId = req.params.caseId;
+  const { status, changedBy } = req.body;
+
+  if (!status) {
+    res.status(400).json({ error: 'status is required' });
+    return;
+  }
+
+  try {
+    const [oldRows] = await pool.query(
+      `SELECT ca.file_status, ca.file_no, ca.client_id, cl.email as client_email
+       FROM cases ca LEFT JOIN clients cl ON ca.client_id = cl.id
+       WHERE ca.id = ?`,
+      [caseId]
+    ) as any[];
+    const caseInfo = (oldRows as any[])[0];
+    if (!caseInfo) { res.status(404).json({ error: 'Case not found' }); return; }
+
+    const oldStatus = caseInfo.file_status;
+    const user = changedBy || (req as any).user?.name || 'Staff';
+
+    await pool.query('UPDATE cases SET file_status = ? WHERE id = ?', [status, caseId]);
+
+    await pool.query(
+      `INSERT INTO status_history (id, case_id, status, date, changed_by) VALUES (?,?,?,CURDATE(),?)`,
+      [generateId(), caseId, status, user]
+    );
+    await pool.query(
+      `INSERT INTO case_history (id, case_id, date, time, user, action, field_changed, old_value, new_value)
+       VALUES (?,?,CURDATE(),TIME(NOW()),?,'Updated','File Status',?,?)`,
+      [generateId(), caseId, user, oldStatus || '', status]
+    );
+
+    // ── Same auto-email-notification pattern as updateCase, non-fatal on failure ──
+    if (oldStatus !== status) {
+      try {
+        if (caseInfo.client_email) {
+          await sendAutoNotification({
+            caseId,
+            to: caseInfo.client_email,
+            subject: `Case ${caseInfo.file_no} — Status Updated to ${status}`,
+            body: `Hello,\n\nYour case ${caseInfo.file_no} status has been updated from "${oldStatus}" to "${status}".\n\nIf you have any questions, please contact our office.\n\nMatrix Legal Services`,
+            triggerType: 'status_change',
+            sentBy: user,
+          });
+        }
+      } catch (emailErr) {
+        console.error('[updateCaseStatus] auto-notification failed (non-fatal):', emailErr);
+      }
+    }
+
+    res.json({ success: true, status });
+  } catch (err) {
+    console.error('[updateCaseStatus]', err);
+    res.status(500).json({ error: 'Server error', detail: (err as any).message });
+  }
+}
+
 export async function deleteCase(req: Request, res: Response): Promise<void> {
   try {
     await pool.query('DELETE FROM cases WHERE id = ?', [req.params.id]);

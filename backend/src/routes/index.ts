@@ -5,7 +5,7 @@ import { login } from '../controllers/auth.controller';
 
 import { getDashboardStats, getRecentCases, getUpcomingLimitations, getReferrers } from '../controllers/dashboard.controller';
 import { getRecentActivities, getActivitiesByCaseId, createActivity } from '../controllers/activities.controller';
-import { getCases, createCase, getCaseById, updateCase } from '../controllers/cases.controller';
+import { getCases, createCase, getCaseById, updateCase, updateCaseStatus } from '../controllers/cases.controller';
 import { getClients, createClient, getClientById, updateClient } from '../controllers/clients.controller';
 import { getNotesByCaseId, createNote, deleteNote } from '../controllers/notes.controller';
 import { getHistoryByCaseId, getStatusHistoryByCaseId } from '../controllers/history.controller';
@@ -58,6 +58,9 @@ router.get('/cases',     getCases);
 router.post('/cases',    createCase);
 router.get('/cases/:id', getCaseById);
 router.put('/cases/:id', updateCase);
+
+// NEW: matches StatusTab.tsx — was 404ing, pre-existing bug, now fixed
+router.post('/cases/:caseId/status', updateCaseStatus);
 
 // Clients
 router.get('/clients',     getClients);
