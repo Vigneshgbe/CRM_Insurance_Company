@@ -33,6 +33,8 @@ import {
   listEditorDocuments, getEditorDocument,
   createEditorDocument, updateEditorDocument, deleteEditorDocument,
 } from '../controllers/editor-documents.controller';
+// ── NEW: Email system (additive only) ───────────────────────────────────────
+import { getEmailsByCaseId, sendCaseEmail, logManualEmail } from '../controllers/email.controller';
 
 const router = Router();
 
@@ -164,5 +166,10 @@ router.post  ('/editor-documents',     createEditorDocument);
 router.get   ('/editor-documents/:id', getEditorDocument);
 router.put   ('/editor-documents/:id', updateEditorDocument);
 router.delete('/editor-documents/:id', deleteEditorDocument);
+
+// ── NEW: Email (additive only — does not change anything above) ────────────
+router.get ('/cases/:caseId/emails',      getEmailsByCaseId);
+router.post('/cases/:caseId/emails/send', sendCaseEmail);
+router.post('/cases/:caseId/emails/log',  logManualEmail);
 
 export default router;
