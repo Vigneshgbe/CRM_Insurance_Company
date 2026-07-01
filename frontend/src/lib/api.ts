@@ -65,13 +65,22 @@ export const authApi = {
 // ============================================================
 // DASHBOARD
 // ============================================================
+// REPLACE only the dashboardApi block in api.ts with this:
+
 export const dashboardApi = {
+  // ── existing (unchanged) ──────────────────────────────────
   getStats: () =>
     apiFetch<{
       totalCases: number;
       activeCases: number;
       casesThisMonth: number;
       settlementsPending: number;
+      vsLastMonth?: {
+        totalCases: number;
+        activeCases: number;
+        casesThisMonth: number;
+        settlementsPending: number;
+      };
     }>("/dashboard/stats"),
 
   getRecentCases: () => apiFetch<any[]>("/dashboard/recent-cases"),
@@ -81,6 +90,13 @@ export const dashboardApi = {
 
   getRecentActivities: () =>
     apiFetch<any[]>("/dashboard/recent-activities"),
+
+  // ── new ───────────────────────────────────────────────────
+  getCaseStatusBreakdown: () =>
+    apiFetch<{ status: string; count: number }[]>("/dashboard/case-status-breakdown"),
+
+  getCaseStatusTrend: () =>
+    apiFetch<{ date: string; count: number }[]>("/dashboard/case-status-trend"),
 };
 
 // ============================================================

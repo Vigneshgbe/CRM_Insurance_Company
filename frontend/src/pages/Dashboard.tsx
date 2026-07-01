@@ -12,10 +12,9 @@ import {
   Upload, FileText, CalendarDays, ChevronLeft, ChevronRight,
   ArrowRight, Scale, Briefcase, Activity, Clock,
 } from "lucide-react";
-import { API_BASE_URL } from "@/lib/constants";
+import { dashboardApi } from "@/lib/api";
 
-// ── helpers ────────────────────────────────────────────────────────────────
-
+// ── Status badge colors (original — untouched) ───────────────
 const statusColor: Record<string, string> = {
   Active:      "bg-success text-success-foreground",
   Closed:      "bg-muted text-muted-foreground",
@@ -27,7 +26,7 @@ const statusColor: Record<string, string> = {
   Arbitration: "bg-destructive text-destructive-foreground",
 };
 
-// Donut chart colors aligned with bronze palette + semantic colors
+// ── Donut chart colors ───────────────────────────────────────
 const DONUT_COLORS: Record<string, string> = {
   Active:      "hsl(160 84% 39%)",
   Mediation:   "hsl(38 92% 50%)",
@@ -38,36 +37,28 @@ const DONUT_COLORS: Record<string, string> = {
   Arbitration: "hsl(0 72% 51%)",
   Closed:      "hsl(215 16% 67%)",
 };
-
 const FALLBACK_COLORS = [
   "hsl(21 95% 27%)", "hsl(25 60% 40%)", "hsl(38 92% 50%)",
   "hsl(0 84% 60%)", "hsl(160 84% 39%)", "hsl(215 16% 47%)",
 ];
-
 function getColor(status: string, idx: number) {
   return DONUT_COLORS[status] ?? FALLBACK_COLORS[idx % FALLBACK_COLORS.length];
 }
 
-// ── Mini Donut SVG ─────────────────────────────────────────────────────────
-
+// ── Donut SVG ────────────────────────────────────────────────
 function DonutChart({ data }: { data: { status: string; count: number }[] }) {
   const total = data.reduce((s, d) => s + Number(d.count), 0);
   if (total === 0) {
     return (
-      <div className="flex items-center justify-center h-40 w-40">
-        <svg viewBox="0 0 100 100" className="h-40 w-40">
-          <circle cx="50" cy="50" r="36" fill="none" stroke="hsl(var(--border))" strokeWidth="14" />
-          <text x="50" y="50" textAnchor="middle" dominantBaseline="middle"
-            fontSize="10" fill="hsl(var(--muted-foreground))">No data</text>
-        </svg>
-      </div>
+      <svg viewBox="0 0 100 100" className="h-36 w-36">
+        <circle cx="50" cy="50" r="36" fill="none" stroke="hsl(var(--border))" strokeWidth="14" />
+        <text x="50" y="50" textAnchor="middle" dominantBaseline="middle"
+          fontSize="9" fill="hsl(var(--muted-foreground))">No data</text>
+      </svg>
     );
   }
-
-  const r = 36; const cx = 50; const cy = 50;
-  const circ = 2 * Math.PI * r;
+  const r = 36; const circ = 2 * Math.PI * r;
   let cumulative = 0;
-
   const slices = data.map((d, i) => {
     const pct = Number(d.count) / total;
     const offset = circ * (1 - cumulative);
@@ -76,78 +67,68 @@ function DonutChart({ data }: { data: { status: string; count: number }[] }) {
     cumulative += pct;
     return slice;
   });
-
   return (
     <div className="relative flex items-center justify-center">
-      <svg viewBox="0 0 100 100" className="h-40 w-40 -rotate-90">
+      <svg viewBox="0 0 100 100" className="h-36 w-36 -rotate-90">
         {slices.map((s, i) => (
-          <circle key={i} cx={cx} cy={cy} r={r}
-            fill="none"
-            stroke={s.color}
-            strokeWidth="14"
+          <circle key={i} cx="50" cy="50" r={r} fill="none"
+            stroke={s.color} strokeWidth="14"
             strokeDasharray={`${s.dash} ${circ - s.dash}`}
-            strokeDashoffset={-s.offset + circ}
-            className="transition-all duration-500"
-          />
+            strokeDashoffset={-s.offset + circ} />
         ))}
       </svg>
-      <div className="absolute text-center">
+      <div className="absolute text-center pointer-events-none">
         <p className="text-2xl font-bold text-foreground">{total}</p>
-        <p className="text-[10px] text-muted-foreground leading-tight">Total Cases</p>
+        <p className="text-[10px] text-muted-foreground">Total Cases</p>
       </div>
     </div>
   );
 }
 
-// ── Mini Line Chart SVG ────────────────────────────────────────────────────
-
+// ── Sparkline SVG ────────────────────────────────────────────
 function SparkLine({ data }: { data: { date: string; count: number }[] }) {
+  if (!data.length) {
+    return (
+      <div className="h-24 flex items-center justify-center text-xs text-muted-foreground">
+        No trend data
+      </div>
+    );
+  }
+  const W = 280; const H = 72; const PAD = 8;
   const counts = data.map(d => d.count);
   const max = Math.max(...counts, 1);
-  const W = 300; const H = 80; const PAD = 10;
-
-  const points = data.map((d, i) => {
+  const pts = data.map((d, i) => {
     const x = PAD + (i / (data.length - 1 || 1)) * (W - PAD * 2);
-    const y = H - PAD - ((d.count / max) * (H - PAD * 2));
-    return `${x},${y}`;
-  }).join(" ");
-
-  const areaPoints = [
+    const y = H - PAD - (d.count / max) * (H - PAD * 2);
+    return [x, y] as [number, number];
+  });
+  const polyline = pts.map(([x, y]) => `${x},${y}`).join(" ");
+  const area = [
     `${PAD},${H - PAD}`,
-    ...data.map((d, i) => {
-      const x = PAD + (i / (data.length - 1 || 1)) * (W - PAD * 2);
-      const y = H - PAD - ((d.count / max) * (H - PAD * 2));
-      return `${x},${y}`;
-    }),
+    ...pts.map(([x, y]) => `${x},${y}`),
     `${W - PAD},${H - PAD}`,
   ].join(" ");
-
-  const labels = data.filter((_, i) => i % 2 === 0);
-
   return (
-    <svg viewBox={`0 0 ${W} ${H + 16}`} className="w-full h-28">
+    <svg viewBox={`0 0 ${W} ${H + 14}`} className="w-full h-24">
       <defs>
-        <linearGradient id="sparkGrad" x1="0" y1="0" x2="0" y2="1">
-          <stop offset="0%" stopColor="hsl(21 95% 27%)" stopOpacity="0.25" />
+        <linearGradient id="sg" x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0%" stopColor="hsl(21 95% 27%)" stopOpacity="0.2" />
           <stop offset="100%" stopColor="hsl(21 95% 27%)" stopOpacity="0.02" />
         </linearGradient>
       </defs>
-      <polygon points={areaPoints} fill="url(#sparkGrad)" />
-      <polyline points={points} fill="none"
-        stroke="hsl(21 95% 27%)" strokeWidth="2" strokeLinejoin="round" strokeLinecap="round" />
-      {data.map((d, i) => {
-        const x = PAD + (i / (data.length - 1 || 1)) * (W - PAD * 2);
-        const y = H - PAD - ((d.count / max) * (H - PAD * 2));
-        return (
-          <circle key={i} cx={x} cy={y} r="2.5"
-            fill="hsl(21 95% 27%)" stroke="white" strokeWidth="1" />
-        );
-      })}
-      {labels.map((d, i) => {
+      <polygon points={area} fill="url(#sg)" />
+      <polyline points={polyline} fill="none"
+        stroke="hsl(21 95% 27%)" strokeWidth="2"
+        strokeLinejoin="round" strokeLinecap="round" />
+      {pts.map(([x, y], i) => (
+        <circle key={i} cx={x} cy={y} r="2.5"
+          fill="hsl(21 95% 27%)" stroke="white" strokeWidth="1" />
+      ))}
+      {data.filter((_, i) => i % 2 === 0).map((d) => {
         const origIdx = data.indexOf(d);
         const x = PAD + (origIdx / (data.length - 1 || 1)) * (W - PAD * 2);
         return (
-          <text key={i} x={x} y={H + 12} textAnchor="middle"
+          <text key={origIdx} x={x} y={H + 10} textAnchor="middle"
             fontSize="7" fill="hsl(var(--muted-foreground))">
             {d.date.slice(5)}
           </text>
@@ -157,35 +138,30 @@ function SparkLine({ data }: { data: { date: string; count: number }[] }) {
   );
 }
 
-// ── Mini Calendar ──────────────────────────────────────────────────────────
-
+// ── Mini Calendar ────────────────────────────────────────────
 function MiniCalendar({ limitationDates }: { limitationDates: string[] }) {
   const [cur, setCur] = useState(new Date());
   const today = new Date();
-
   const year = cur.getFullYear();
   const month = cur.getMonth();
   const firstDay = new Date(year, month, 1).getDay();
   const daysInMonth = new Date(year, month + 1, 0).getDate();
-
   const limSet = new Set(
     limitationDates.map(d => {
       const dt = new Date(d);
       return `${dt.getFullYear()}-${dt.getMonth()}-${dt.getDate()}`;
     })
   );
-
   const cells: (number | null)[] = [
     ...Array(firstDay).fill(null),
     ...Array.from({ length: daysInMonth }, (_, i) => i + 1),
   ];
-
-  const monthName = cur.toLocaleString("default", { month: "long", year: "numeric" });
-
   return (
     <div>
       <div className="flex items-center justify-between mb-3">
-        <span className="text-sm font-semibold text-foreground">{monthName}</span>
+        <span className="text-sm font-semibold text-foreground">
+          {cur.toLocaleString("default", { month: "long", year: "numeric" })}
+        </span>
         <div className="flex gap-1">
           <button onClick={() => setCur(new Date(year, month - 1, 1))}
             className="p-1 rounded hover:bg-muted transition-colors">
@@ -204,8 +180,7 @@ function MiniCalendar({ limitationDates }: { limitationDates: string[] }) {
         {cells.map((day, i) => {
           if (!day) return <div key={i} />;
           const isToday = day === today.getDate() && month === today.getMonth() && year === today.getFullYear();
-          const key = `${year}-${month}-${day}`;
-          const isLimit = limSet.has(key);
+          const isLimit = limSet.has(`${year}-${month}-${day}`);
           return (
             <div key={i} className={cn(
               "text-[11px] h-6 w-6 mx-auto flex items-center justify-center rounded-full cursor-default transition-colors",
@@ -226,18 +201,16 @@ function MiniCalendar({ limitationDates }: { limitationDates: string[] }) {
   );
 }
 
-// ── Activity icon ──────────────────────────────────────────────────────────
-
-const activityIcon: Record<string, { icon: React.ReactNode; bg: string }> = {
-  Note:        { icon: <FileText className="h-3 w-3" />,    bg: "bg-primary/10 text-primary" },
-  Task:        { icon: <Briefcase className="h-3 w-3" />,   bg: "bg-warning/10 text-warning" },
-  Call:        { icon: <Activity className="h-3 w-3" />,    bg: "bg-success/10 text-success" },
-  Email:       { icon: <FileText className="h-3 w-3" />,    bg: "bg-accent/10 text-accent" },
+// ── Activity icon ────────────────────────────────────────────
+const activityIconMap: Record<string, { icon: React.ReactNode; bg: string }> = {
+  Note:        { icon: <FileText className="h-3 w-3" />,     bg: "bg-primary/10 text-primary" },
+  Task:        { icon: <Briefcase className="h-3 w-3" />,    bg: "bg-warning/10 text-warning" },
+  Call:        { icon: <Activity className="h-3 w-3" />,     bg: "bg-success/10 text-success" },
+  Email:       { icon: <FileText className="h-3 w-3" />,     bg: "bg-accent/10 text-accent" },
   Appointment: { icon: <CalendarDays className="h-3 w-3" />, bg: "bg-destructive/10 text-destructive" },
 };
-
 function ActivityIcon({ type }: { type: string }) {
-  const def = activityIcon[type] ?? { icon: <Clock className="h-3 w-3" />, bg: "bg-muted text-muted-foreground" };
+  const def = activityIconMap[type] ?? { icon: <Clock className="h-3 w-3" />, bg: "bg-muted text-muted-foreground" };
   return (
     <div className={cn("h-7 w-7 rounded-full flex items-center justify-center shrink-0", def.bg)}>
       {def.icon}
@@ -245,39 +218,32 @@ function ActivityIcon({ type }: { type: string }) {
   );
 }
 
-// ── API ────────────────────────────────────────────────────────────────────
-
-async function apiFetch(path: string) {
-  const token = localStorage.getItem("crm_token");
-  const res = await fetch(`${API_BASE_URL}${path}`, {
-    headers: { Authorization: `Bearer ${token}` },
-  });
-  if (!res.ok) throw new Error(`${path} ${res.status}`);
-  return res.json();
-}
-
-// ── Dashboard ──────────────────────────────────────────────────────────────
-
+// ── Dashboard page ───────────────────────────────────────────
 export default function Dashboard() {
   const navigate = useNavigate();
 
-  const [stats, setStats] = useState<any>({
+  // original state (untouched)
+  const [stats, setStats] = useState({
     totalCases: 0, activeCases: 0, casesThisMonth: 0, settlementsPending: 0,
     vsLastMonth: { totalCases: 0, activeCases: 0, casesThisMonth: 0, settlementsPending: 0 },
   });
   const [recentCases,         setRecentCases]         = useState<any[]>([]);
   const [upcomingLimitations, setUpcomingLimitations] = useState<any[]>([]);
   const [recentActivities,    setRecentActivities]    = useState<any[]>([]);
-  const [statusBreakdown,     setStatusBreakdown]     = useState<any[]>([]);
-  const [trend,               setTrend]               = useState<any[]>([]);
+
+  // new state
+  const [statusBreakdown, setStatusBreakdown] = useState<{ status: string; count: number }[]>([]);
+  const [trend,           setTrend]           = useState<{ date: string; count: number }[]>([]);
 
   useEffect(() => {
-    apiFetch("/api/dashboard/stats").then(setStats).catch(console.error);
-    apiFetch("/api/dashboard/recent-cases").then(setRecentCases).catch(console.error);
-    apiFetch("/api/dashboard/upcoming-limitations").then(setUpcomingLimitations).catch(console.error);
-    apiFetch("/api/dashboard/recent-activities").then(setRecentActivities).catch(console.error);
-    apiFetch("/api/dashboard/case-status-breakdown").then(setStatusBreakdown).catch(console.error);
-    apiFetch("/api/dashboard/case-status-trend").then(setTrend).catch(console.error);
+    // original 4 calls — untouched
+    dashboardApi.getStats().then(setStats).catch(console.error);
+    dashboardApi.getRecentCases().then(setRecentCases).catch(console.error);
+    dashboardApi.getUpcomingLimitations().then(setUpcomingLimitations).catch(console.error);
+    dashboardApi.getRecentActivities().then(setRecentActivities).catch(console.error);
+    // 2 new calls
+    dashboardApi.getCaseStatusBreakdown().then(setStatusBreakdown).catch(console.error);
+    dashboardApi.getCaseStatusTrend().then(setTrend).catch(console.error);
   }, []);
 
   const limitationDateStrings = useMemo(
@@ -285,7 +251,6 @@ export default function Dashboard() {
     [upcomingLimitations]
   );
 
-  // Stat cards config
   const statCards = [
     {
       label: "Total Cases", value: stats.totalCases, sub: "All time cases",
@@ -309,22 +274,21 @@ export default function Dashboard() {
     },
   ];
 
-  // Quick actions
   const quickActions = [
-    { label: "Add New Case",    sub: "Create a new case and get started",    icon: <Plus className="h-6 w-6" />,        color: "text-primary bg-primary/10",     onClick: () => navigate("/cases/new") },
-    { label: "Add New Client",  sub: "Register a new client to the system",  icon: <UserPlus className="h-6 w-6" />,    color: "text-success bg-success/10",     onClick: () => navigate("/clients/new") },
-    { label: "Upload Document", sub: "Upload and manage case documents",     icon: <Upload className="h-6 w-6" />,      color: "text-accent bg-accent/10",       onClick: () => navigate("/documents") },
-    { label: "Create OCF",      sub: "Generate OCF forms instantly",         icon: <FileText className="h-6 w-6" />,    color: "text-warning bg-warning/10",     onClick: () => navigate("/cases") },
-    { label: "View Calendar",   sub: "Check deadlines and hearings",         icon: <CalendarDays className="h-6 w-6" />, color: "text-destructive bg-destructive/10", onClick: () => navigate("/cases") },
+    { label: "Add New Case",    sub: "Create a new case",          icon: <Plus className="h-6 w-6" />,         color: "text-primary bg-primary/10",         onClick: () => navigate("/cases/new") },
+    { label: "Add New Client",  sub: "Register a new client",      icon: <UserPlus className="h-6 w-6" />,     color: "text-success bg-success/10",         onClick: () => navigate("/clients/new") },
+    { label: "Upload Document", sub: "Upload case documents",      icon: <Upload className="h-6 w-6" />,       color: "text-accent bg-accent/10",           onClick: () => navigate("/documents") },
+    { label: "Create OCF",      sub: "Generate OCF forms",         icon: <FileText className="h-6 w-6" />,     color: "text-warning bg-warning/10",         onClick: () => navigate("/cases") },
+    { label: "View Calendar",   sub: "Check deadlines & hearings", icon: <CalendarDays className="h-6 w-6" />, color: "text-destructive bg-destructive/10", onClick: () => navigate("/cases") },
   ];
 
   return (
     <AppLayout title="Dashboard">
 
-      {/* ── Welcome bar ── */}
+      {/* Welcome bar */}
       <div className="flex items-center justify-between mb-6">
         <div>
-          <h2 className="text-lg font-semibold text-foreground">Dashboard</h2>
+          {/* <h2 className="text-lg font-semibold text-foreground">Dashboard</h2> */}
           <p className="text-sm text-muted-foreground">Welcome back! Here's what's happening today.</p>
         </div>
         <Button onClick={() => navigate("/cases/new")} className="gap-2">
@@ -332,7 +296,7 @@ export default function Dashboard() {
         </Button>
       </div>
 
-      {/* ── Stat cards ── */}
+      {/* Stat cards */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
         {statCards.map((s) => (
           <Card key={s.label} className="hover:shadow-md transition-shadow">
@@ -348,13 +312,11 @@ export default function Dashboard() {
                 </div>
               </div>
               <div className="flex items-center gap-1 mt-3 pt-3 border-t border-border">
-                {s.pct > 0 ? (
-                  <TrendingUp className="h-3 w-3 text-success" />
-                ) : s.pct < 0 ? (
-                  <TrendingDown className="h-3 w-3 text-destructive" />
-                ) : (
-                  <Minus className="h-3 w-3 text-muted-foreground" />
-                )}
+                {s.pct > 0
+                  ? <TrendingUp className="h-3 w-3 text-success" />
+                  : s.pct < 0
+                  ? <TrendingDown className="h-3 w-3 text-destructive" />
+                  : <Minus className="h-3 w-3 text-muted-foreground" />}
                 <span className={cn("text-xs font-medium",
                   s.pct > 0 ? "text-success" : s.pct < 0 ? "text-destructive" : "text-muted-foreground"
                 )}>
@@ -367,37 +329,35 @@ export default function Dashboard() {
         ))}
       </div>
 
-      {/* ── Middle row: Charts + Right panel ── */}
+      {/* Charts + right panel */}
       <div className="grid grid-cols-1 lg:grid-cols-5 gap-6 mb-6">
-
-        {/* Case Overview + Trend */}
         <div className="lg:col-span-3 space-y-6">
+
+          {/* Case Overview */}
           <Card>
             <CardHeader className="pb-2">
               <CardTitle className="text-base">Case Overview</CardTitle>
             </CardHeader>
             <CardContent>
-              <div className="flex flex-col sm:flex-row gap-6">
-                {/* Donut */}
-                <div className="flex flex-col items-center gap-4">
+              <div className="flex flex-col sm:flex-row gap-6 items-start">
+                <div className="flex flex-col items-center gap-3 shrink-0">
                   <DonutChart data={statusBreakdown} />
-                  <div className="grid grid-cols-2 gap-x-6 gap-y-1.5">
+                  <div className="grid grid-cols-2 gap-x-5 gap-y-1.5 w-full">
                     {statusBreakdown.map((d, i) => (
                       <div key={d.status} className="flex items-center gap-1.5">
-                        <div className="h-2.5 w-2.5 rounded-full shrink-0"
+                        <div className="h-2 w-2 rounded-full shrink-0"
                           style={{ background: getColor(d.status, i) }} />
                         <span className="text-xs text-muted-foreground">{d.status}</span>
-                        <span className="text-xs font-medium text-foreground ml-auto">{d.count}</span>
+                        <span className="text-xs font-semibold text-foreground ml-auto">{d.count}</span>
                       </div>
                     ))}
                     {statusBreakdown.length === 0 && (
-                      <span className="text-xs text-muted-foreground col-span-2">No cases yet.</span>
+                      <p className="text-xs text-muted-foreground col-span-2">No cases yet.</p>
                     )}
                   </div>
                 </div>
-                {/* Line trend */}
                 <div className="flex-1 min-w-0">
-                  <p className="text-xs font-medium text-muted-foreground mb-2 uppercase tracking-wide">
+                  <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide mb-1">
                     Case Trend — Last 14 Days
                   </p>
                   <SparkLine data={trend} />
@@ -406,7 +366,7 @@ export default function Dashboard() {
             </CardContent>
           </Card>
 
-          {/* Recent Cases */}
+          {/* Recent Cases — original table rendering logic, untouched */}
           <Card>
             <CardHeader className="pb-2 flex-row items-center justify-between">
               <CardTitle className="text-base">Recent Cases</CardTitle>
@@ -440,17 +400,14 @@ export default function Dashboard() {
                       return (
                         <TableRow key={c.id} className="text-sm hover:bg-muted/30">
                           <TableCell className="py-2 pl-4">
-                            <Link to={`/cases/${c.id}`}
-                              className="font-medium text-primary hover:underline">
+                            <Link to={`/cases/${c.id}`} className="font-medium text-primary hover:underline">
                               {c.file_no}
                             </Link>
                           </TableCell>
                           <TableCell className="py-2">{c.first_name} {c.last_name}</TableCell>
                           <TableCell className="py-2 text-muted-foreground">{formatDate(c.date_of_loss)}</TableCell>
                           <TableCell className="py-2">
-                            <Badge className={cn("text-xs", statusColor[c.file_status])}>
-                              {c.file_status}
-                            </Badge>
+                            <Badge className={cn("text-xs", statusColor[c.file_status])}>{c.file_status}</Badge>
                           </TableCell>
                           <TableCell className="py-2">
                             {c.clerk_assigned ? (
@@ -486,7 +443,7 @@ export default function Dashboard() {
         {/* Right panel */}
         <div className="lg:col-span-2 space-y-6">
 
-          {/* Upcoming Limitation Dates */}
+          {/* Upcoming Limitation Dates — original rendering logic, untouched */}
           <Card>
             <CardHeader className="pb-2 flex-row items-center justify-between">
               <CardTitle className="text-base">Upcoming Limitation Dates</CardTitle>
@@ -503,7 +460,7 @@ export default function Dashboard() {
                     const days = daysUntil(c.limitation_date);
                     return (
                       <Link key={c.id} to={`/cases/${c.id}`}
-                        className="flex items-center justify-between p-2.5 rounded-lg hover:bg-muted/50 transition-colors group">
+                        className="flex items-center justify-between p-2.5 rounded-lg hover:bg-muted/50 transition-colors">
                         <div className="flex items-center gap-2.5 min-w-0">
                           <div className="h-8 w-8 rounded-lg bg-warning/10 text-warning flex items-center justify-center shrink-0">
                             <CalendarDays className="h-4 w-4" />
@@ -530,7 +487,7 @@ export default function Dashboard() {
             </CardContent>
           </Card>
 
-          {/* Recent Activities */}
+          {/* Recent Activities — original rendering logic, untouched */}
           <Card>
             <CardHeader className="pb-2 flex-row items-center justify-between">
               <CardTitle className="text-base">Recent Activities</CardTitle>
@@ -549,9 +506,7 @@ export default function Dashboard() {
                       <div className="min-w-0 flex-1">
                         <p className="text-sm text-foreground leading-tight">
                           {a.regarding || a.type}
-                          {a.file_no && (
-                            <span className="text-muted-foreground"> · {a.file_no}</span>
-                          )}
+                          {a.file_no && <span className="text-muted-foreground"> · {a.file_no}</span>}
                         </p>
                         <p className="text-[11px] text-muted-foreground mt-0.5">
                           {formatDate(a.date)} · {a.record_manager || a.author || "—"}
@@ -564,7 +519,7 @@ export default function Dashboard() {
             </CardContent>
           </Card>
 
-          {/* Calendar Overview */}
+          {/* Calendar Overview — new */}
           <Card>
             <CardHeader className="pb-2 flex-row items-center justify-between">
               <CardTitle className="text-base">Calendar Overview</CardTitle>
@@ -579,7 +534,7 @@ export default function Dashboard() {
         </div>
       </div>
 
-      {/* ── Quick Actions ── */}
+      {/* Quick Actions */}
       <Card>
         <CardHeader className="pb-3">
           <CardTitle className="text-base">Quick Actions</CardTitle>
