@@ -3,7 +3,7 @@ import { authenticate } from '../middlewares/auth.middleware';
 
 import { login } from '../controllers/auth.controller';
 
-import { getDashboardStats, getRecentCases, getUpcomingLimitations, getReferrers } from '../controllers/dashboard.controller';
+import { getDashboardStats, getRecentCases, getUpcomingLimitations, getReferrers, getCaseStatusBreakdown, getCaseStatusTrend } from '../controllers/dashboard.controller';
 import { getRecentActivities, getActivitiesByCaseId, createActivity } from '../controllers/activities.controller';
 import { getCases, createCase, getCaseById, updateCase, updateCaseStatus } from '../controllers/cases.controller';
 import { getClients, createClient, getClientById, updateClient } from '../controllers/clients.controller';
@@ -49,6 +49,8 @@ router.get('/dashboard/stats',                getDashboardStats);
 router.get('/dashboard/recent-cases',         getRecentCases);
 router.get('/dashboard/upcoming-limitations', getUpcomingLimitations);
 router.get('/dashboard/recent-activities',    getRecentActivities);
+router.get('/dashboard/case-status-breakdown', getCaseStatusBreakdown);
+router.get('/dashboard/case-status-trend',     getCaseStatusTrend);
 
 // Referrers
 router.get('/referrers', getReferrers);
