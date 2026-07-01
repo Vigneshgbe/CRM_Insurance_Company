@@ -289,12 +289,6 @@ export default function Dashboard() {
     [upcomingLimitations]
   );
 
-  // Pre-compute total for progress bars
-  const breakdownTotal = useMemo(
-    () => statusBreakdown.reduce((s, d) => s + parseInt(String(d.count), 10), 0),
-    [statusBreakdown]
-  );
-
   const statCards = [
     {
       label: "Total Cases", value: stats.totalCases, sub: "All time cases",
@@ -382,57 +376,39 @@ export default function Dashboard() {
             <CardHeader className="pb-3">
               <CardTitle className="text-base">Case Overview</CardTitle>
             </CardHeader>
-            <CardContent className="space-y-4">
+            <CardContent>
+              {/* Single row: donut | legend | trend chart */}
+              <div className="flex gap-4 items-center">
 
-              {/* TOP ROW: big donut LEFT, progress-bar legend RIGHT */}
-              <div className="flex gap-6 items-center">
-                {/* Donut — fixed width so it doesn't shrink */}
+                {/* 1. Donut */}
                 <div className="shrink-0">
                   <DonutChart data={statusBreakdown} />
                 </div>
 
-                {/* Legend with progress bars */}
-                <div className="flex-1 min-w-0 space-y-3">
+                {/* 2. Legend — dot + name + count, stacked vertically */}
+                <div className="shrink-0 space-y-2 px-2">
                   {statusBreakdown.length === 0 ? (
-                    <p className="text-sm text-muted-foreground">No cases yet.</p>
+                    <p className="text-xs text-muted-foreground">No cases</p>
                   ) : (
-                    statusBreakdown.map((d, i) => {
-                      const pct = breakdownTotal > 0
-                        ? Math.round((parseInt(String(d.count), 10) / breakdownTotal) * 100)
-                        : 0;
-                      const color = getColor(d.status, i);
-                      return (
-                        <div key={d.status}>
-                          <div className="flex items-center justify-between mb-1.5">
-                            <div className="flex items-center gap-2">
-                              <div className="h-2.5 w-2.5 rounded-full shrink-0"
-                                style={{ background: color }} />
-                              <span className="text-sm font-medium text-foreground">{d.status}</span>
-                            </div>
-                            <div className="flex items-center gap-3">
-                              <span className="text-xs text-muted-foreground">{pct}%</span>
-                              <span className="text-sm font-bold text-foreground w-5 text-right">
-                                {d.count}
-                              </span>
-                            </div>
-                          </div>
-                          <div className="h-2 w-full bg-muted rounded-full overflow-hidden">
-                            <div className="h-full rounded-full"
-                              style={{ width: `${pct}%`, background: color }} />
-                          </div>
-                        </div>
-                      );
-                    })
+                    statusBreakdown.map((d, i) => (
+                      <div key={d.status} className="flex items-center gap-2">
+                        <div className="h-2.5 w-2.5 rounded-full shrink-0"
+                          style={{ background: getColor(d.status, i) }} />
+                        <span className="text-sm text-foreground whitespace-nowrap">{d.status}</span>
+                        <span className="text-sm font-bold text-foreground ml-1">{d.count}</span>
+                      </div>
+                    ))
                   )}
                 </div>
-              </div>
 
-              {/* BOTTOM: full-width trend chart */}
-              <div className="border-t border-border pt-4">
-                <p className="text-xs font-semibold text-muted-foreground uppercase tracking-widest mb-2">
-                  Case Trend — Last 14 Days
-                </p>
-                <SparkLine data={trend} />
+                {/* 3. Trend chart — fills remaining space */}
+                <div className="flex-1 min-w-0">
+                  <p className="text-xs font-semibold text-muted-foreground uppercase tracking-widest mb-1">
+                    Case Trend — Last 14 Days
+                  </p>
+                  <SparkLine data={trend} />
+                </div>
+
               </div>
             </CardContent>
           </Card>
