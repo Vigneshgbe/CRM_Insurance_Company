@@ -1,96 +1,471 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { AppLayout } from "@/components/layout/AppLayout";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { formatDate, daysUntil } from "@/lib/formatters";
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import { cn } from "@/lib/utils";
-import { Eye } from "lucide-react";
-import { dashboardApi } from "@/lib/api";
+import {
+  Eye, TrendingUp, TrendingDown, Minus, Plus, UserPlus,
+  Upload, FileText, CalendarDays, ChevronLeft, ChevronRight,
+  ArrowRight, Scale, Briefcase, Activity, Clock,
+} from "lucide-react";
+import { API_BASE_URL } from "@/lib/constants";
+
+// ── helpers ────────────────────────────────────────────────────────────────
 
 const statusColor: Record<string, string> = {
-  Active: "bg-success text-success-foreground",
-  Closed: "bg-muted text-muted-foreground",
-  Pending: "bg-warning text-warning-foreground",
-  "On Hold": "bg-muted text-muted-foreground",
-  Settled: "bg-primary text-primary-foreground",
-  Litigation: "bg-destructive text-destructive-foreground",
-  Mediation: "bg-warning text-warning-foreground",
+  Active:      "bg-success text-success-foreground",
+  Closed:      "bg-muted text-muted-foreground",
+  Pending:     "bg-warning text-warning-foreground",
+  "On Hold":   "bg-muted text-muted-foreground",
+  Settled:     "bg-primary text-primary-foreground",
+  Litigation:  "bg-destructive text-destructive-foreground",
+  Mediation:   "bg-warning text-warning-foreground",
   Arbitration: "bg-destructive text-destructive-foreground",
 };
 
+// Donut chart colors aligned with bronze palette + semantic colors
+const DONUT_COLORS: Record<string, string> = {
+  Active:      "hsl(160 84% 39%)",
+  Mediation:   "hsl(38 92% 50%)",
+  Litigation:  "hsl(0 84% 60%)",
+  Settled:     "hsl(21 95% 27%)",
+  Pending:     "hsl(25 60% 40%)",
+  "On Hold":   "hsl(215 16% 47%)",
+  Arbitration: "hsl(0 72% 51%)",
+  Closed:      "hsl(215 16% 67%)",
+};
+
+const FALLBACK_COLORS = [
+  "hsl(21 95% 27%)", "hsl(25 60% 40%)", "hsl(38 92% 50%)",
+  "hsl(0 84% 60%)", "hsl(160 84% 39%)", "hsl(215 16% 47%)",
+];
+
+function getColor(status: string, idx: number) {
+  return DONUT_COLORS[status] ?? FALLBACK_COLORS[idx % FALLBACK_COLORS.length];
+}
+
+// ── Mini Donut SVG ─────────────────────────────────────────────────────────
+
+function DonutChart({ data }: { data: { status: string; count: number }[] }) {
+  const total = data.reduce((s, d) => s + Number(d.count), 0);
+  if (total === 0) {
+    return (
+      <div className="flex items-center justify-center h-40 w-40">
+        <svg viewBox="0 0 100 100" className="h-40 w-40">
+          <circle cx="50" cy="50" r="36" fill="none" stroke="hsl(var(--border))" strokeWidth="14" />
+          <text x="50" y="50" textAnchor="middle" dominantBaseline="middle"
+            fontSize="10" fill="hsl(var(--muted-foreground))">No data</text>
+        </svg>
+      </div>
+    );
+  }
+
+  const r = 36; const cx = 50; const cy = 50;
+  const circ = 2 * Math.PI * r;
+  let cumulative = 0;
+
+  const slices = data.map((d, i) => {
+    const pct = Number(d.count) / total;
+    const offset = circ * (1 - cumulative);
+    const dash = circ * pct;
+    const slice = { ...d, pct, offset, dash, color: getColor(d.status, i) };
+    cumulative += pct;
+    return slice;
+  });
+
+  return (
+    <div className="relative flex items-center justify-center">
+      <svg viewBox="0 0 100 100" className="h-40 w-40 -rotate-90">
+        {slices.map((s, i) => (
+          <circle key={i} cx={cx} cy={cy} r={r}
+            fill="none"
+            stroke={s.color}
+            strokeWidth="14"
+            strokeDasharray={`${s.dash} ${circ - s.dash}`}
+            strokeDashoffset={-s.offset + circ}
+            className="transition-all duration-500"
+          />
+        ))}
+      </svg>
+      <div className="absolute text-center">
+        <p className="text-2xl font-bold text-foreground">{total}</p>
+        <p className="text-[10px] text-muted-foreground leading-tight">Total Cases</p>
+      </div>
+    </div>
+  );
+}
+
+// ── Mini Line Chart SVG ────────────────────────────────────────────────────
+
+function SparkLine({ data }: { data: { date: string; count: number }[] }) {
+  const counts = data.map(d => d.count);
+  const max = Math.max(...counts, 1);
+  const W = 300; const H = 80; const PAD = 10;
+
+  const points = data.map((d, i) => {
+    const x = PAD + (i / (data.length - 1 || 1)) * (W - PAD * 2);
+    const y = H - PAD - ((d.count / max) * (H - PAD * 2));
+    return `${x},${y}`;
+  }).join(" ");
+
+  const areaPoints = [
+    `${PAD},${H - PAD}`,
+    ...data.map((d, i) => {
+      const x = PAD + (i / (data.length - 1 || 1)) * (W - PAD * 2);
+      const y = H - PAD - ((d.count / max) * (H - PAD * 2));
+      return `${x},${y}`;
+    }),
+    `${W - PAD},${H - PAD}`,
+  ].join(" ");
+
+  const labels = data.filter((_, i) => i % 2 === 0);
+
+  return (
+    <svg viewBox={`0 0 ${W} ${H + 16}`} className="w-full h-28">
+      <defs>
+        <linearGradient id="sparkGrad" x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0%" stopColor="hsl(21 95% 27%)" stopOpacity="0.25" />
+          <stop offset="100%" stopColor="hsl(21 95% 27%)" stopOpacity="0.02" />
+        </linearGradient>
+      </defs>
+      <polygon points={areaPoints} fill="url(#sparkGrad)" />
+      <polyline points={points} fill="none"
+        stroke="hsl(21 95% 27%)" strokeWidth="2" strokeLinejoin="round" strokeLinecap="round" />
+      {data.map((d, i) => {
+        const x = PAD + (i / (data.length - 1 || 1)) * (W - PAD * 2);
+        const y = H - PAD - ((d.count / max) * (H - PAD * 2));
+        return (
+          <circle key={i} cx={x} cy={y} r="2.5"
+            fill="hsl(21 95% 27%)" stroke="white" strokeWidth="1" />
+        );
+      })}
+      {labels.map((d, i) => {
+        const origIdx = data.indexOf(d);
+        const x = PAD + (origIdx / (data.length - 1 || 1)) * (W - PAD * 2);
+        return (
+          <text key={i} x={x} y={H + 12} textAnchor="middle"
+            fontSize="7" fill="hsl(var(--muted-foreground))">
+            {d.date.slice(5)}
+          </text>
+        );
+      })}
+    </svg>
+  );
+}
+
+// ── Mini Calendar ──────────────────────────────────────────────────────────
+
+function MiniCalendar({ limitationDates }: { limitationDates: string[] }) {
+  const [cur, setCur] = useState(new Date());
+  const today = new Date();
+
+  const year = cur.getFullYear();
+  const month = cur.getMonth();
+  const firstDay = new Date(year, month, 1).getDay();
+  const daysInMonth = new Date(year, month + 1, 0).getDate();
+
+  const limSet = new Set(
+    limitationDates.map(d => {
+      const dt = new Date(d);
+      return `${dt.getFullYear()}-${dt.getMonth()}-${dt.getDate()}`;
+    })
+  );
+
+  const cells: (number | null)[] = [
+    ...Array(firstDay).fill(null),
+    ...Array.from({ length: daysInMonth }, (_, i) => i + 1),
+  ];
+
+  const monthName = cur.toLocaleString("default", { month: "long", year: "numeric" });
+
+  return (
+    <div>
+      <div className="flex items-center justify-between mb-3">
+        <span className="text-sm font-semibold text-foreground">{monthName}</span>
+        <div className="flex gap-1">
+          <button onClick={() => setCur(new Date(year, month - 1, 1))}
+            className="p-1 rounded hover:bg-muted transition-colors">
+            <ChevronLeft className="h-3.5 w-3.5 text-muted-foreground" />
+          </button>
+          <button onClick={() => setCur(new Date(year, month + 1, 1))}
+            className="p-1 rounded hover:bg-muted transition-colors">
+            <ChevronRight className="h-3.5 w-3.5 text-muted-foreground" />
+          </button>
+        </div>
+      </div>
+      <div className="grid grid-cols-7 gap-0.5 text-center">
+        {["Su","Mo","Tu","We","Th","Fr","Sa"].map(d => (
+          <div key={d} className="text-[10px] text-muted-foreground font-medium py-1">{d}</div>
+        ))}
+        {cells.map((day, i) => {
+          if (!day) return <div key={i} />;
+          const isToday = day === today.getDate() && month === today.getMonth() && year === today.getFullYear();
+          const key = `${year}-${month}-${day}`;
+          const isLimit = limSet.has(key);
+          return (
+            <div key={i} className={cn(
+              "text-[11px] h-6 w-6 mx-auto flex items-center justify-center rounded-full cursor-default transition-colors",
+              isToday && "bg-primary text-primary-foreground font-bold",
+              isLimit && !isToday && "bg-destructive/20 text-destructive font-semibold ring-1 ring-destructive/40",
+              !isToday && !isLimit && "hover:bg-muted text-foreground",
+            )}>{day}</div>
+          );
+        })}
+      </div>
+      {limSet.size > 0 && (
+        <div className="mt-2 flex items-center gap-1.5 text-[10px] text-muted-foreground">
+          <div className="h-2 w-2 rounded-full bg-destructive/60" />
+          Limitation date
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ── Activity icon ──────────────────────────────────────────────────────────
+
+const activityIcon: Record<string, { icon: React.ReactNode; bg: string }> = {
+  Note:        { icon: <FileText className="h-3 w-3" />,    bg: "bg-primary/10 text-primary" },
+  Task:        { icon: <Briefcase className="h-3 w-3" />,   bg: "bg-warning/10 text-warning" },
+  Call:        { icon: <Activity className="h-3 w-3" />,    bg: "bg-success/10 text-success" },
+  Email:       { icon: <FileText className="h-3 w-3" />,    bg: "bg-accent/10 text-accent" },
+  Appointment: { icon: <CalendarDays className="h-3 w-3" />, bg: "bg-destructive/10 text-destructive" },
+};
+
+function ActivityIcon({ type }: { type: string }) {
+  const def = activityIcon[type] ?? { icon: <Clock className="h-3 w-3" />, bg: "bg-muted text-muted-foreground" };
+  return (
+    <div className={cn("h-7 w-7 rounded-full flex items-center justify-center shrink-0", def.bg)}>
+      {def.icon}
+    </div>
+  );
+}
+
+// ── API ────────────────────────────────────────────────────────────────────
+
+async function apiFetch(path: string) {
+  const token = localStorage.getItem("crm_token");
+  const res = await fetch(`${API_BASE_URL}${path}`, {
+    headers: { Authorization: `Bearer ${token}` },
+  });
+  if (!res.ok) throw new Error(`${path} ${res.status}`);
+  return res.json();
+}
+
+// ── Dashboard ──────────────────────────────────────────────────────────────
+
 export default function Dashboard() {
-  const [stats, setStats] = useState({ totalCases: 0, activeCases: 0, casesThisMonth: 0, settlementsPending: 0 });
-  const [recentCases, setRecentCases] = useState<any[]>([]);
+  const navigate = useNavigate();
+
+  const [stats, setStats] = useState<any>({
+    totalCases: 0, activeCases: 0, casesThisMonth: 0, settlementsPending: 0,
+    vsLastMonth: { totalCases: 0, activeCases: 0, casesThisMonth: 0, settlementsPending: 0 },
+  });
+  const [recentCases,         setRecentCases]         = useState<any[]>([]);
   const [upcomingLimitations, setUpcomingLimitations] = useState<any[]>([]);
-  const [recentActivities, setRecentActivities] = useState<any[]>([]);
+  const [recentActivities,    setRecentActivities]    = useState<any[]>([]);
+  const [statusBreakdown,     setStatusBreakdown]     = useState<any[]>([]);
+  const [trend,               setTrend]               = useState<any[]>([]);
 
   useEffect(() => {
-    dashboardApi.getStats().then(setStats).catch(console.error);
-    dashboardApi.getRecentCases().then(setRecentCases).catch(console.error);
-    dashboardApi.getUpcomingLimitations().then(setUpcomingLimitations).catch(console.error);
-    dashboardApi.getRecentActivities().then(setRecentActivities).catch(console.error);
+    apiFetch("/api/dashboard/stats").then(setStats).catch(console.error);
+    apiFetch("/api/dashboard/recent-cases").then(setRecentCases).catch(console.error);
+    apiFetch("/api/dashboard/upcoming-limitations").then(setUpcomingLimitations).catch(console.error);
+    apiFetch("/api/dashboard/recent-activities").then(setRecentActivities).catch(console.error);
+    apiFetch("/api/dashboard/case-status-breakdown").then(setStatusBreakdown).catch(console.error);
+    apiFetch("/api/dashboard/case-status-trend").then(setTrend).catch(console.error);
   }, []);
 
+  const limitationDateStrings = useMemo(
+    () => upcomingLimitations.map(u => u.limitation_date),
+    [upcomingLimitations]
+  );
+
+  // Stat cards config
   const statCards = [
-    { label: "Total Cases", value: stats.totalCases, className: "border-l-primary" },
-    { label: "Active Cases", value: stats.activeCases, className: "border-l-success" },
-    { label: "Cases This Month", value: stats.casesThisMonth, className: "border-l-warning" },
-    { label: "Settlements Pending", value: stats.settlementsPending, className: "border-l-destructive" },
+    {
+      label: "Total Cases", value: stats.totalCases, sub: "All time cases",
+      icon: <Scale className="h-5 w-5" />, iconBg: "bg-primary/10 text-primary",
+      pct: stats.vsLastMonth?.totalCases ?? 0,
+    },
+    {
+      label: "Active Cases", value: stats.activeCases, sub: "Currently active",
+      icon: <Activity className="h-5 w-5" />, iconBg: "bg-success/10 text-success",
+      pct: stats.vsLastMonth?.activeCases ?? 0,
+    },
+    {
+      label: "Cases This Month", value: stats.casesThisMonth, sub: "New cases",
+      icon: <Briefcase className="h-5 w-5" />, iconBg: "bg-warning/10 text-warning",
+      pct: stats.vsLastMonth?.casesThisMonth ?? 0,
+    },
+    {
+      label: "Settlements Pending", value: stats.settlementsPending, sub: "Awaiting settlement",
+      icon: <Clock className="h-5 w-5" />, iconBg: "bg-destructive/10 text-destructive",
+      pct: stats.vsLastMonth?.settlementsPending ?? 0,
+    },
+  ];
+
+  // Quick actions
+  const quickActions = [
+    { label: "Add New Case",    sub: "Create a new case and get started",    icon: <Plus className="h-6 w-6" />,        color: "text-primary bg-primary/10",     onClick: () => navigate("/cases/new") },
+    { label: "Add New Client",  sub: "Register a new client to the system",  icon: <UserPlus className="h-6 w-6" />,    color: "text-success bg-success/10",     onClick: () => navigate("/clients/new") },
+    { label: "Upload Document", sub: "Upload and manage case documents",     icon: <Upload className="h-6 w-6" />,      color: "text-accent bg-accent/10",       onClick: () => navigate("/documents") },
+    { label: "Create OCF",      sub: "Generate OCF forms instantly",         icon: <FileText className="h-6 w-6" />,    color: "text-warning bg-warning/10",     onClick: () => navigate("/cases") },
+    { label: "View Calendar",   sub: "Check deadlines and hearings",         icon: <CalendarDays className="h-6 w-6" />, color: "text-destructive bg-destructive/10", onClick: () => navigate("/cases") },
   ];
 
   return (
     <AppLayout title="Dashboard">
+
+      {/* ── Welcome bar ── */}
+      <div className="flex items-center justify-between mb-6">
+        <div>
+          <h2 className="text-lg font-semibold text-foreground">Dashboard</h2>
+          <p className="text-sm text-muted-foreground">Welcome back! Here's what's happening today.</p>
+        </div>
+        <Button onClick={() => navigate("/cases/new")} className="gap-2">
+          <Plus className="h-4 w-4" /> New Case
+        </Button>
+      </div>
+
+      {/* ── Stat cards ── */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
         {statCards.map((s) => (
-          <Card key={s.label} className={cn("border-l-4", s.className)}>
-            <CardContent className="p-4">
-              <p className="text-sm text-muted-foreground">{s.label}</p>
-              <p className="text-2xl font-bold mt-1">{s.value}</p>
+          <Card key={s.label} className="hover:shadow-md transition-shadow">
+            <CardContent className="p-5">
+              <div className="flex items-start justify-between">
+                <div>
+                  <p className="text-xs text-muted-foreground font-medium uppercase tracking-wide">{s.label}</p>
+                  <p className="text-3xl font-bold mt-1 text-foreground">{s.value}</p>
+                  <p className="text-xs text-muted-foreground mt-0.5">{s.sub}</p>
+                </div>
+                <div className={cn("h-10 w-10 rounded-xl flex items-center justify-center", s.iconBg)}>
+                  {s.icon}
+                </div>
+              </div>
+              <div className="flex items-center gap-1 mt-3 pt-3 border-t border-border">
+                {s.pct > 0 ? (
+                  <TrendingUp className="h-3 w-3 text-success" />
+                ) : s.pct < 0 ? (
+                  <TrendingDown className="h-3 w-3 text-destructive" />
+                ) : (
+                  <Minus className="h-3 w-3 text-muted-foreground" />
+                )}
+                <span className={cn("text-xs font-medium",
+                  s.pct > 0 ? "text-success" : s.pct < 0 ? "text-destructive" : "text-muted-foreground"
+                )}>
+                  {s.pct > 0 ? "+" : ""}{s.pct}%
+                </span>
+                <span className="text-xs text-muted-foreground">vs last month</span>
+              </div>
             </CardContent>
           </Card>
         ))}
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-5 gap-6">
-        <div className="lg:col-span-3">
+      {/* ── Middle row: Charts + Right panel ── */}
+      <div className="grid grid-cols-1 lg:grid-cols-5 gap-6 mb-6">
+
+        {/* Case Overview + Trend */}
+        <div className="lg:col-span-3 space-y-6">
           <Card>
-            <CardHeader className="pb-3">
+            <CardHeader className="pb-2">
+              <CardTitle className="text-base">Case Overview</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="flex flex-col sm:flex-row gap-6">
+                {/* Donut */}
+                <div className="flex flex-col items-center gap-4">
+                  <DonutChart data={statusBreakdown} />
+                  <div className="grid grid-cols-2 gap-x-6 gap-y-1.5">
+                    {statusBreakdown.map((d, i) => (
+                      <div key={d.status} className="flex items-center gap-1.5">
+                        <div className="h-2.5 w-2.5 rounded-full shrink-0"
+                          style={{ background: getColor(d.status, i) }} />
+                        <span className="text-xs text-muted-foreground">{d.status}</span>
+                        <span className="text-xs font-medium text-foreground ml-auto">{d.count}</span>
+                      </div>
+                    ))}
+                    {statusBreakdown.length === 0 && (
+                      <span className="text-xs text-muted-foreground col-span-2">No cases yet.</span>
+                    )}
+                  </div>
+                </div>
+                {/* Line trend */}
+                <div className="flex-1 min-w-0">
+                  <p className="text-xs font-medium text-muted-foreground mb-2 uppercase tracking-wide">
+                    Case Trend — Last 14 Days
+                  </p>
+                  <SparkLine data={trend} />
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* Recent Cases */}
+          <Card>
+            <CardHeader className="pb-2 flex-row items-center justify-between">
               <CardTitle className="text-base">Recent Cases</CardTitle>
+              <Button variant="ghost" size="sm" asChild className="text-xs gap-1 h-7">
+                <Link to="/cases">View All <ArrowRight className="h-3 w-3" /></Link>
+              </Button>
             </CardHeader>
             <CardContent className="p-0">
               <Table>
                 <TableHeader>
                   <TableRow>
-                    <TableHead className="text-xs">File No</TableHead>
+                    <TableHead className="text-xs pl-4">File No</TableHead>
                     <TableHead className="text-xs">Client Name</TableHead>
                     <TableHead className="text-xs">Date of Loss</TableHead>
                     <TableHead className="text-xs">Status</TableHead>
                     <TableHead className="text-xs">Assigned To</TableHead>
                     <TableHead className="text-xs">Limitation</TableHead>
-                    <TableHead className="text-xs w-10"></TableHead>
+                    <TableHead className="text-xs w-10" />
                   </TableRow>
                 </TableHeader>
                 <TableBody>
                   {recentCases.length === 0 ? (
                     <TableRow>
-                      <TableCell colSpan={7} className="text-center text-muted-foreground py-6">No cases yet.</TableCell>
+                      <TableCell colSpan={7} className="text-center text-muted-foreground py-8 text-sm">
+                        No cases yet.
+                      </TableCell>
                     </TableRow>
                   ) : (
                     recentCases.map((c: any) => {
                       const limDays = daysUntil(c.limitation_date);
                       return (
-                        <TableRow key={c.id} className="text-sm">
-                          <TableCell className="py-2 font-medium">{c.file_no}</TableCell>
-                          <TableCell className="py-2">{c.first_name} {c.last_name}</TableCell>
-                          <TableCell className="py-2">{formatDate(c.date_of_loss)}</TableCell>
-                          <TableCell className="py-2">
-                            <Badge className={cn("text-xs", statusColor[c.file_status])}>{c.file_status}</Badge>
+                        <TableRow key={c.id} className="text-sm hover:bg-muted/30">
+                          <TableCell className="py-2 pl-4">
+                            <Link to={`/cases/${c.id}`}
+                              className="font-medium text-primary hover:underline">
+                              {c.file_no}
+                            </Link>
                           </TableCell>
-                          <TableCell className="py-2">{c.clerk_assigned || "—"}</TableCell>
-                          <TableCell className={cn("py-2", limDays !== null && limDays <= 7 && limDays >= 0 ? "text-destructive font-semibold" : "")}>
+                          <TableCell className="py-2">{c.first_name} {c.last_name}</TableCell>
+                          <TableCell className="py-2 text-muted-foreground">{formatDate(c.date_of_loss)}</TableCell>
+                          <TableCell className="py-2">
+                            <Badge className={cn("text-xs", statusColor[c.file_status])}>
+                              {c.file_status}
+                            </Badge>
+                          </TableCell>
+                          <TableCell className="py-2">
+                            {c.clerk_assigned ? (
+                              <div className="flex items-center gap-1.5">
+                                <div className="h-5 w-5 rounded-full bg-primary text-primary-foreground text-[9px] font-bold flex items-center justify-center shrink-0">
+                                  {c.clerk_assigned.split(" ").map((n: string) => n[0]).join("").slice(0, 2).toUpperCase()}
+                                </div>
+                                <span className="text-xs">{c.clerk_assigned}</span>
+                              </div>
+                            ) : "—"}
+                          </TableCell>
+                          <TableCell className={cn("py-2 text-xs",
+                            limDays !== null && limDays <= 7 && limDays >= 0
+                              ? "text-destructive font-semibold" : "text-muted-foreground"
+                          )}>
                             {formatDate(c.limitation_date)}
                           </TableCell>
                           <TableCell className="py-2">
@@ -108,27 +483,45 @@ export default function Dashboard() {
           </Card>
         </div>
 
+        {/* Right panel */}
         <div className="lg:col-span-2 space-y-6">
+
+          {/* Upcoming Limitation Dates */}
           <Card>
-            <CardHeader className="pb-3">
+            <CardHeader className="pb-2 flex-row items-center justify-between">
               <CardTitle className="text-base">Upcoming Limitation Dates</CardTitle>
+              <Button variant="ghost" size="sm" asChild className="text-xs gap-1 h-7">
+                <Link to="/cases">View All <ArrowRight className="h-3 w-3" /></Link>
+              </Button>
             </CardHeader>
             <CardContent>
               {upcomingLimitations.length === 0 ? (
-                <p className="text-sm text-muted-foreground">No upcoming limitations within 30 days.</p>
+                <p className="text-sm text-muted-foreground py-2">No upcoming limitations within 30 days.</p>
               ) : (
-                <div className="space-y-3">
+                <div className="space-y-2">
                   {upcomingLimitations.map((c: any) => {
                     const days = daysUntil(c.limitation_date);
                     return (
-                      <Link key={c.id} to={`/cases/${c.id}`} className="flex items-center justify-between p-2 rounded hover:bg-muted/50">
-                        <div>
-                          <p className="text-sm font-medium">{c.first_name} {c.last_name}</p>
-                          <p className="text-xs text-muted-foreground">{c.file_no}</p>
+                      <Link key={c.id} to={`/cases/${c.id}`}
+                        className="flex items-center justify-between p-2.5 rounded-lg hover:bg-muted/50 transition-colors group">
+                        <div className="flex items-center gap-2.5 min-w-0">
+                          <div className="h-8 w-8 rounded-lg bg-warning/10 text-warning flex items-center justify-center shrink-0">
+                            <CalendarDays className="h-4 w-4" />
+                          </div>
+                          <div className="min-w-0">
+                            <p className="text-sm font-medium text-foreground truncate">
+                              {c.first_name} {c.last_name}
+                            </p>
+                            <p className="text-xs text-muted-foreground">{c.file_no}</p>
+                          </div>
                         </div>
-                        <Badge variant={days !== null && days <= 7 ? "destructive" : "secondary"} className="text-xs">
-                          {days} days
-                        </Badge>
+                        <div className="text-right shrink-0 ml-2">
+                          <p className="text-xs text-muted-foreground">{formatDate(c.limitation_date)}</p>
+                          <Badge variant={days !== null && days <= 7 ? "destructive" : "secondary"}
+                            className="text-[10px] mt-0.5">
+                            {days} days
+                          </Badge>
+                        </div>
                       </Link>
                     );
                   })}
@@ -137,21 +530,32 @@ export default function Dashboard() {
             </CardContent>
           </Card>
 
+          {/* Recent Activities */}
           <Card>
-            <CardHeader className="pb-3">
+            <CardHeader className="pb-2 flex-row items-center justify-between">
               <CardTitle className="text-base">Recent Activities</CardTitle>
+              <Button variant="ghost" size="sm" asChild className="text-xs gap-1 h-7">
+                <Link to="/cases">View All <ArrowRight className="h-3 w-3" /></Link>
+              </Button>
             </CardHeader>
             <CardContent>
               {recentActivities.length === 0 ? (
-                <p className="text-sm text-muted-foreground">No recent activities.</p>
+                <p className="text-sm text-muted-foreground py-2">No recent activities.</p>
               ) : (
                 <div className="space-y-3">
-                  {recentActivities.slice(0, 5).map((a: any) => (
+                  {recentActivities.slice(0, 6).map((a: any) => (
                     <div key={a.id} className="flex items-start gap-3">
-                      <div className="h-2 w-2 rounded-full bg-primary mt-1.5 shrink-0" />
-                      <div className="min-w-0">
-                        <p className="text-sm">{a.regarding || a.type}</p>
-                        <p className="text-xs text-muted-foreground">{formatDate(a.date)} · {a.record_manager || a.author}</p>
+                      <ActivityIcon type={a.type} />
+                      <div className="min-w-0 flex-1">
+                        <p className="text-sm text-foreground leading-tight">
+                          {a.regarding || a.type}
+                          {a.file_no && (
+                            <span className="text-muted-foreground"> · {a.file_no}</span>
+                          )}
+                        </p>
+                        <p className="text-[11px] text-muted-foreground mt-0.5">
+                          {formatDate(a.date)} · {a.record_manager || a.author || "—"}
+                        </p>
                       </div>
                     </div>
                   ))}
@@ -159,8 +563,45 @@ export default function Dashboard() {
               )}
             </CardContent>
           </Card>
+
+          {/* Calendar Overview */}
+          <Card>
+            <CardHeader className="pb-2 flex-row items-center justify-between">
+              <CardTitle className="text-base">Calendar Overview</CardTitle>
+              <Button variant="ghost" size="sm" asChild className="text-xs gap-1 h-7">
+                <Link to="/cases">View Calendar <ArrowRight className="h-3 w-3" /></Link>
+              </Button>
+            </CardHeader>
+            <CardContent>
+              <MiniCalendar limitationDates={limitationDateStrings} />
+            </CardContent>
+          </Card>
         </div>
       </div>
+
+      {/* ── Quick Actions ── */}
+      <Card>
+        <CardHeader className="pb-3">
+          <CardTitle className="text-base">Quick Actions</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-4">
+            {quickActions.map((a) => (
+              <button key={a.label} onClick={a.onClick}
+                className="flex flex-col items-center gap-2.5 p-4 rounded-xl border border-border hover:border-primary/40 hover:bg-muted/40 transition-all group text-center">
+                <div className={cn("h-12 w-12 rounded-xl flex items-center justify-center transition-transform group-hover:scale-110", a.color)}>
+                  {a.icon}
+                </div>
+                <div>
+                  <p className="text-sm font-medium text-foreground">{a.label}</p>
+                  <p className="text-[10px] text-muted-foreground leading-tight mt-0.5">{a.sub}</p>
+                </div>
+              </button>
+            ))}
+          </div>
+        </CardContent>
+      </Card>
+
     </AppLayout>
   );
 }
