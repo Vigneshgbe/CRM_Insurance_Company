@@ -313,10 +313,10 @@ export default function Dashboard() {
   ];
 
   const quickActions = [
-    { label: "Add New Case",    sub: "Create a new client & case", icon: <Plus className="h-6 w-6" />,         color: "text-primary bg-primary/10",         onClick: () => navigate("/clients/new") },
     { label: "Add New Client",  sub: "Register a new client",      icon: <UserPlus className="h-6 w-6" />,     color: "text-success bg-success/10",         onClick: () => navigate("/clients/new") },
     { label: "Upload Document", sub: "Upload case documents",      icon: <Upload className="h-6 w-6" />,       color: "text-accent bg-accent/10",           onClick: () => navigate("/documents") },
-    { label: "Create OCF",      sub: "Generate OCF forms",         icon: <FileText className="h-6 w-6" />,     color: "text-warning bg-warning/10",         onClick: () => navigate("/cases") },
+    { label: "Create OCF",      sub: "Generate OCF forms",         icon: <FileText className="h-6 w-6" />,     color: "text-warning bg-warning/10",         onClick: () => navigate("/templates") },
+    { label: "Create New File", sub: "Create a new document file",      icon: <Plus className="h-6 w-6" />,         color: "text-primary bg-primary/10",         onClick: () => navigate("/document-editor") },
     { label: "View Cases",      sub: "Browse all cases",           icon: <CalendarDays className="h-6 w-6" />, color: "text-destructive bg-destructive/10", onClick: () => navigate("/cases") },
   ];
 
@@ -326,7 +326,7 @@ export default function Dashboard() {
       {/* ── Welcome bar ── */}
       <div className="flex items-center justify-between mb-6">
         <div>
-          <h2 className="text-lg font-semibold text-foreground">Dashboard</h2>
+          {/* <h2 className="text-lg font-semibold text-foreground">Dashboard</h2> */}
           <p className="text-sm text-muted-foreground">Welcome back! Here's what's happening today.</p>
         </div>
         <Button onClick={() => navigate("/clients/new")} className="gap-2">
