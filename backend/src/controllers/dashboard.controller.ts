@@ -105,12 +105,14 @@ export async function getRecentActivities(req: Request, res: Response): Promise<
 export async function getCaseStatusBreakdown(req: Request, res: Response): Promise<void> {
   try {
     const [rows] = await pool.query(
-      `SELECT file_status as status, COUNT(*) as count
+      `SELECT file_status as status, CAST(COUNT(*) AS UNSIGNED) as count
        FROM cases
        GROUP BY file_status
        ORDER BY count DESC`
     ) as any[];
-    res.json(rows);
+    // Ensure count is always a JS number, not BigInt
+    const safe = (rows as any[]).map(r => ({ status: r.status, count: Number(r.count) }));
+    res.json(safe);
   } catch (err) { res.status(500).json({ error: 'Server error' }); }
 }
 
@@ -118,7 +120,7 @@ export async function getCaseStatusBreakdown(req: Request, res: Response): Promi
 export async function getCaseStatusTrend(req: Request, res: Response): Promise<void> {
   try {
     const [rows] = await pool.query(
-      `SELECT DATE(open_date) as date, COUNT(*) as count
+      `SELECT DATE(open_date) as date, CAST(COUNT(*) AS UNSIGNED) as count
        FROM cases
        WHERE open_date >= DATE_SUB(CURDATE(), INTERVAL 13 DAY)
        GROUP BY DATE(open_date)
@@ -128,7 +130,10 @@ export async function getCaseStatusTrend(req: Request, res: Response): Promise<v
     // Fill missing days with 0 so the chart line is continuous
     const map: Record<string, number> = {};
     (rows as any[]).forEach((r: any) => {
-      map[r.date.toISOString().slice(0, 10)] = Number(r.count);
+      const key = r.date instanceof Date
+        ? r.date.toISOString().slice(0, 10)
+        : String(r.date).slice(0, 10);
+      map[key] = Number(r.count);
     });
     const result = [];
     for (let i = 13; i >= 0; i--) {

@@ -47,7 +47,7 @@ function getColor(status: string, idx: number) {
 
 // ── Donut SVG ────────────────────────────────────────────────
 function DonutChart({ data }: { data: { status: string; count: number }[] }) {
-  const total = data.reduce((s, d) => s + Number(d.count), 0);
+  const total = data.reduce((s, d) => s + parseInt(String(d.count), 10), 0);
   if (total === 0) {
     return (
       <svg viewBox="0 0 100 100" className="h-36 w-36">
@@ -60,7 +60,7 @@ function DonutChart({ data }: { data: { status: string; count: number }[] }) {
   const r = 36; const circ = 2 * Math.PI * r;
   let cumulative = 0;
   const slices = data.map((d, i) => {
-    const pct = Number(d.count) / total;
+    const pct = parseInt(String(d.count), 10) / total;
     const offset = circ * (1 - cumulative);
     const dash = circ * pct;
     const slice = { ...d, pct, offset, dash, color: getColor(d.status, i) };
@@ -275,11 +275,11 @@ export default function Dashboard() {
   ];
 
   const quickActions = [
-    { label: "Add New Case",    sub: "Create a new case",          icon: <Plus className="h-6 w-6" />,         color: "text-primary bg-primary/10",         onClick: () => navigate("/cases/new") },
+    { label: "Add New Case",    sub: "Create a new client & case", icon: <Plus className="h-6 w-6" />,         color: "text-primary bg-primary/10",         onClick: () => navigate("/clients/new") },
     { label: "Add New Client",  sub: "Register a new client",      icon: <UserPlus className="h-6 w-6" />,     color: "text-success bg-success/10",         onClick: () => navigate("/clients/new") },
     { label: "Upload Document", sub: "Upload case documents",      icon: <Upload className="h-6 w-6" />,       color: "text-accent bg-accent/10",           onClick: () => navigate("/documents") },
     { label: "Create OCF",      sub: "Generate OCF forms",         icon: <FileText className="h-6 w-6" />,     color: "text-warning bg-warning/10",         onClick: () => navigate("/cases") },
-    { label: "View Calendar",   sub: "Check deadlines & hearings", icon: <CalendarDays className="h-6 w-6" />, color: "text-destructive bg-destructive/10", onClick: () => navigate("/cases") },
+    { label: "View Cases",      sub: "Browse all cases",           icon: <CalendarDays className="h-6 w-6" />, color: "text-destructive bg-destructive/10", onClick: () => navigate("/cases") },
   ];
 
   return (
@@ -288,7 +288,7 @@ export default function Dashboard() {
       {/* Welcome bar */}
       <div className="flex items-center justify-between mb-6">
         <div>
-          {/* <h2 className="text-lg font-semibold text-foreground">Dashboard</h2> */}
+          <h2 className="text-lg font-semibold text-foreground">Dashboard</h2>
           <p className="text-sm text-muted-foreground">Welcome back! Here's what's happening today.</p>
         </div>
         <Button onClick={() => navigate("/cases/new")} className="gap-2">
