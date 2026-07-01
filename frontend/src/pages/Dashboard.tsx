@@ -14,7 +14,21 @@ import {
 } from "lucide-react";
 import { dashboardApi } from "@/lib/api";
 
-// ── Status badge colors (original — untouched) ───────────────
+// ── Types ─────────────────────────────────────────────────────
+interface StatsData {
+  totalCases: number;
+  activeCases: number;
+  casesThisMonth: number;
+  settlementsPending: number;
+  vsLastMonth: {
+    totalCases: number;
+    activeCases: number;
+    casesThisMonth: number;
+    settlementsPending: number;
+  };
+}
+
+// ── Status badge colors (original — untouched) ────────────────
 const statusColor: Record<string, string> = {
   Active:      "bg-success text-success-foreground",
   Closed:      "bg-muted text-muted-foreground",
@@ -26,7 +40,7 @@ const statusColor: Record<string, string> = {
   Arbitration: "bg-destructive text-destructive-foreground",
 };
 
-// ── Donut chart colors ───────────────────────────────────────
+// ── Donut chart colors ────────────────────────────────────────
 const DONUT_COLORS: Record<string, string> = {
   Active:      "hsl(160 84% 39%)",
   Mediation:   "hsl(38 92% 50%)",
@@ -45,19 +59,25 @@ function getColor(status: string, idx: number) {
   return DONUT_COLORS[status] ?? FALLBACK_COLORS[idx % FALLBACK_COLORS.length];
 }
 
-// ── Donut SVG ────────────────────────────────────────────────
+// ── Donut SVG ─────────────────────────────────────────────────
+// Large prominent donut — h-52 w-52, thick ring, big centre number
 function DonutChart({ data }: { data: { status: string; count: number }[] }) {
   const total = data.reduce((s, d) => s + parseInt(String(d.count), 10), 0);
   if (total === 0) {
     return (
-      <svg viewBox="0 0 100 100" className="h-36 w-36">
-        <circle cx="50" cy="50" r="36" fill="none" stroke="hsl(var(--border))" strokeWidth="14" />
-        <text x="50" y="50" textAnchor="middle" dominantBaseline="middle"
-          fontSize="9" fill="hsl(var(--muted-foreground))">No data</text>
-      </svg>
+      <div className="relative flex items-center justify-center">
+        <svg viewBox="0 0 100 100" className="h-52 w-52">
+          <circle cx="50" cy="50" r="40" fill="none"
+            stroke="hsl(var(--border))" strokeWidth="11" />
+        </svg>
+        <div className="absolute text-center pointer-events-none">
+          <p className="text-3xl font-bold text-foreground">0</p>
+          <p className="text-xs text-muted-foreground">Total Cases</p>
+        </div>
+      </div>
     );
   }
-  const r = 36; const circ = 2 * Math.PI * r;
+  const r = 40; const circ = 2 * Math.PI * r;
   let cumulative = 0;
   const slices = data.map((d, i) => {
     const pct = parseInt(String(d.count), 10) / total;
@@ -69,67 +89,85 @@ function DonutChart({ data }: { data: { status: string; count: number }[] }) {
   });
   return (
     <div className="relative flex items-center justify-center">
-      <svg viewBox="0 0 100 100" className="h-36 w-36 -rotate-90">
+      <svg viewBox="0 0 100 100" className="h-52 w-52 -rotate-90">
         {slices.map((s, i) => (
           <circle key={i} cx="50" cy="50" r={r} fill="none"
-            stroke={s.color} strokeWidth="14"
+            stroke={s.color} strokeWidth="11"
             strokeDasharray={`${s.dash} ${circ - s.dash}`}
             strokeDashoffset={-s.offset + circ} />
         ))}
       </svg>
       <div className="absolute text-center pointer-events-none">
-        <p className="text-2xl font-bold text-foreground">{total}</p>
-        <p className="text-[10px] text-muted-foreground">Total Cases</p>
+        <p className="text-4xl font-bold text-foreground">{total}</p>
+        <p className="text-xs text-muted-foreground mt-0.5">Total Cases</p>
       </div>
     </div>
   );
 }
 
-// ── Sparkline SVG ────────────────────────────────────────────
+// ── Sparkline SVG ─────────────────────────────────────────────
+// Full-width, taller chart with gridlines
 function SparkLine({ data }: { data: { date: string; count: number }[] }) {
   if (!data.length) {
     return (
-      <div className="h-24 flex items-center justify-center text-xs text-muted-foreground">
+      <div className="h-40 flex items-center justify-center text-xs text-muted-foreground">
         No trend data
       </div>
     );
   }
-  const W = 280; const H = 72; const PAD = 8;
+  const W = 340; const H = 110; const PAD_L = 22; const PAD_R = 10; const PAD_V = 10;
   const counts = data.map(d => d.count);
   const max = Math.max(...counts, 1);
   const pts = data.map((d, i) => {
-    const x = PAD + (i / (data.length - 1 || 1)) * (W - PAD * 2);
-    const y = H - PAD - (d.count / max) * (H - PAD * 2);
+    const x = PAD_L + (i / (data.length - 1 || 1)) * (W - PAD_L - PAD_R);
+    const y = PAD_V + (1 - d.count / max) * (H - PAD_V * 2);
     return [x, y] as [number, number];
   });
   const polyline = pts.map(([x, y]) => `${x},${y}`).join(" ");
   const area = [
-    `${PAD},${H - PAD}`,
+    `${PAD_L},${H - PAD_V}`,
     ...pts.map(([x, y]) => `${x},${y}`),
-    `${W - PAD},${H - PAD}`,
+    `${W - PAD_R},${H - PAD_V}`,
   ].join(" ");
+  const gridVals = [0, Math.round(max / 2), max];
   return (
-    <svg viewBox={`0 0 ${W} ${H + 14}`} className="w-full h-24">
+    <svg viewBox={`0 0 ${W} ${H + 18}`} className="w-full h-44">
       <defs>
-        <linearGradient id="sg" x1="0" y1="0" x2="0" y2="1">
-          <stop offset="0%" stopColor="hsl(21 95% 27%)" stopOpacity="0.2" />
-          <stop offset="100%" stopColor="hsl(21 95% 27%)" stopOpacity="0.02" />
+        <linearGradient id="sg2" x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0%" stopColor="hsl(21 95% 27%)" stopOpacity="0.22" />
+          <stop offset="100%" stopColor="hsl(21 95% 27%)" stopOpacity="0.01" />
         </linearGradient>
       </defs>
-      <polygon points={area} fill="url(#sg)" />
+      {/* Horizontal grid lines */}
+      {gridVals.map((v, i) => {
+        const y = PAD_V + (1 - v / max) * (H - PAD_V * 2);
+        return (
+          <g key={i}>
+            <line x1={PAD_L} y1={y} x2={W - PAD_R} y2={y}
+              stroke="hsl(var(--border))" strokeWidth="0.6" strokeDasharray="4 3" />
+            <text x={PAD_L - 3} y={y + 3} textAnchor="end"
+              fontSize="7" fill="hsl(var(--muted-foreground))">{v}</text>
+          </g>
+        );
+      })}
+      {/* Area fill */}
+      <polygon points={area} fill="url(#sg2)" />
+      {/* Line */}
       <polyline points={polyline} fill="none"
-        stroke="hsl(21 95% 27%)" strokeWidth="2"
+        stroke="hsl(21 95% 27%)" strokeWidth="2.5"
         strokeLinejoin="round" strokeLinecap="round" />
+      {/* Dots */}
       {pts.map(([x, y], i) => (
-        <circle key={i} cx={x} cy={y} r="2.5"
-          fill="hsl(21 95% 27%)" stroke="white" strokeWidth="1" />
+        <circle key={i} cx={x} cy={y} r="3.5"
+          fill="hsl(21 95% 27%)" stroke="white" strokeWidth="1.5" />
       ))}
+      {/* X-axis labels every other point */}
       {data.filter((_, i) => i % 2 === 0).map((d) => {
         const origIdx = data.indexOf(d);
-        const x = PAD + (origIdx / (data.length - 1 || 1)) * (W - PAD * 2);
+        const x = PAD_L + (origIdx / (data.length - 1 || 1)) * (W - PAD_L - PAD_R);
         return (
-          <text key={origIdx} x={x} y={H + 10} textAnchor="middle"
-            fontSize="7" fill="hsl(var(--muted-foreground))">
+          <text key={origIdx} x={x} y={H + 13} textAnchor="middle"
+            fontSize="7.5" fill="hsl(var(--muted-foreground))">
             {d.date.slice(5)}
           </text>
         );
@@ -138,7 +176,7 @@ function SparkLine({ data }: { data: { date: string; count: number }[] }) {
   );
 }
 
-// ── Mini Calendar ────────────────────────────────────────────
+// ── Mini Calendar ─────────────────────────────────────────────
 function MiniCalendar({ limitationDates }: { limitationDates: string[] }) {
   const [cur, setCur] = useState(new Date());
   const today = new Date();
@@ -201,7 +239,7 @@ function MiniCalendar({ limitationDates }: { limitationDates: string[] }) {
   );
 }
 
-// ── Activity icon ────────────────────────────────────────────
+// ── Activity icon ─────────────────────────────────────────────
 const activityIconMap: Record<string, { icon: React.ReactNode; bg: string }> = {
   Note:        { icon: <FileText className="h-3 w-3" />,     bg: "bg-primary/10 text-primary" },
   Task:        { icon: <Briefcase className="h-3 w-3" />,    bg: "bg-warning/10 text-warning" },
@@ -218,26 +256,26 @@ function ActivityIcon({ type }: { type: string }) {
   );
 }
 
-// ── Dashboard page ───────────────────────────────────────────
+// ── Dashboard ─────────────────────────────────────────────────
 export default function Dashboard() {
   const navigate = useNavigate();
 
-  // original state (untouched)
-  const [stats, setStats] = useState({
-    totalCases: 0, activeCases: 0, casesThisMonth: 0, settlementsPending: 0,
+  const [stats, setStats] = useState<StatsData>({
+    totalCases: 0,
+    activeCases: 0,
+    casesThisMonth: 0,
+    settlementsPending: 0,
     vsLastMonth: { totalCases: 0, activeCases: 0, casesThisMonth: 0, settlementsPending: 0 },
   });
   const [recentCases,         setRecentCases]         = useState<any[]>([]);
   const [upcomingLimitations, setUpcomingLimitations] = useState<any[]>([]);
   const [recentActivities,    setRecentActivities]    = useState<any[]>([]);
-
-  // new state
-  const [statusBreakdown, setStatusBreakdown] = useState<{ status: string; count: number }[]>([]);
-  const [trend,           setTrend]           = useState<{ date: string; count: number }[]>([]);
+  const [statusBreakdown,     setStatusBreakdown]     = useState<{ status: string; count: number }[]>([]);
+  const [trend,               setTrend]               = useState<{ date: string; count: number }[]>([]);
 
   useEffect(() => {
     // original 4 calls — untouched
-    dashboardApi.getStats().then(setStats).catch(console.error);
+    dashboardApi.getStats().then((data) => setStats(data as StatsData)).catch(console.error);
     dashboardApi.getRecentCases().then(setRecentCases).catch(console.error);
     dashboardApi.getUpcomingLimitations().then(setUpcomingLimitations).catch(console.error);
     dashboardApi.getRecentActivities().then(setRecentActivities).catch(console.error);
@@ -249,6 +287,12 @@ export default function Dashboard() {
   const limitationDateStrings = useMemo(
     () => upcomingLimitations.map(u => u.limitation_date),
     [upcomingLimitations]
+  );
+
+  // Pre-compute total for progress bars
+  const breakdownTotal = useMemo(
+    () => statusBreakdown.reduce((s, d) => s + parseInt(String(d.count), 10), 0),
+    [statusBreakdown]
   );
 
   const statCards = [
@@ -285,18 +329,18 @@ export default function Dashboard() {
   return (
     <AppLayout title="Dashboard">
 
-      {/* Welcome bar */}
+      {/* ── Welcome bar ── */}
       <div className="flex items-center justify-between mb-6">
         <div>
           <h2 className="text-lg font-semibold text-foreground">Dashboard</h2>
           <p className="text-sm text-muted-foreground">Welcome back! Here's what's happening today.</p>
         </div>
-        <Button onClick={() => navigate("/cases/new")} className="gap-2">
+        <Button onClick={() => navigate("/clients/new")} className="gap-2">
           <Plus className="h-4 w-4" /> New Case
         </Button>
       </div>
 
-      {/* Stat cards */}
+      {/* ── Stat cards ── */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
         {statCards.map((s) => (
           <Card key={s.label} className="hover:shadow-md transition-shadow">
@@ -329,44 +373,71 @@ export default function Dashboard() {
         ))}
       </div>
 
-      {/* Charts + right panel */}
+      {/* ── Main content: left col (3/5) + right panel (2/5) ── */}
       <div className="grid grid-cols-1 lg:grid-cols-5 gap-6 mb-6">
         <div className="lg:col-span-3 space-y-6">
 
-          {/* Case Overview */}
+          {/* ── Case Overview card ── */}
           <Card>
-            <CardHeader className="pb-2">
+            <CardHeader className="pb-3">
               <CardTitle className="text-base">Case Overview</CardTitle>
             </CardHeader>
-            <CardContent>
-              <div className="flex flex-col sm:flex-row gap-6 items-start">
-                <div className="flex flex-col items-center gap-3 shrink-0">
+            <CardContent className="space-y-4">
+
+              {/* TOP ROW: big donut LEFT, progress-bar legend RIGHT */}
+              <div className="flex gap-6 items-center">
+                {/* Donut — fixed width so it doesn't shrink */}
+                <div className="shrink-0">
                   <DonutChart data={statusBreakdown} />
-                  <div className="grid grid-cols-2 gap-x-5 gap-y-1.5 w-full">
-                    {statusBreakdown.map((d, i) => (
-                      <div key={d.status} className="flex items-center gap-1.5">
-                        <div className="h-2 w-2 rounded-full shrink-0"
-                          style={{ background: getColor(d.status, i) }} />
-                        <span className="text-xs text-muted-foreground">{d.status}</span>
-                        <span className="text-xs font-semibold text-foreground ml-auto">{d.count}</span>
-                      </div>
-                    ))}
-                    {statusBreakdown.length === 0 && (
-                      <p className="text-xs text-muted-foreground col-span-2">No cases yet.</p>
-                    )}
-                  </div>
                 </div>
-                <div className="flex-1 min-w-0">
-                  <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide mb-1">
-                    Case Trend — Last 14 Days
-                  </p>
-                  <SparkLine data={trend} />
+
+                {/* Legend with progress bars */}
+                <div className="flex-1 min-w-0 space-y-3">
+                  {statusBreakdown.length === 0 ? (
+                    <p className="text-sm text-muted-foreground">No cases yet.</p>
+                  ) : (
+                    statusBreakdown.map((d, i) => {
+                      const pct = breakdownTotal > 0
+                        ? Math.round((parseInt(String(d.count), 10) / breakdownTotal) * 100)
+                        : 0;
+                      const color = getColor(d.status, i);
+                      return (
+                        <div key={d.status}>
+                          <div className="flex items-center justify-between mb-1.5">
+                            <div className="flex items-center gap-2">
+                              <div className="h-2.5 w-2.5 rounded-full shrink-0"
+                                style={{ background: color }} />
+                              <span className="text-sm font-medium text-foreground">{d.status}</span>
+                            </div>
+                            <div className="flex items-center gap-3">
+                              <span className="text-xs text-muted-foreground">{pct}%</span>
+                              <span className="text-sm font-bold text-foreground w-5 text-right">
+                                {d.count}
+                              </span>
+                            </div>
+                          </div>
+                          <div className="h-2 w-full bg-muted rounded-full overflow-hidden">
+                            <div className="h-full rounded-full"
+                              style={{ width: `${pct}%`, background: color }} />
+                          </div>
+                        </div>
+                      );
+                    })
+                  )}
                 </div>
+              </div>
+
+              {/* BOTTOM: full-width trend chart */}
+              <div className="border-t border-border pt-4">
+                <p className="text-xs font-semibold text-muted-foreground uppercase tracking-widest mb-2">
+                  Case Trend — Last 14 Days
+                </p>
+                <SparkLine data={trend} />
               </div>
             </CardContent>
           </Card>
 
-          {/* Recent Cases — original table rendering logic, untouched */}
+          {/* ── Recent Cases ── */}
           <Card>
             <CardHeader className="pb-2 flex-row items-center justify-between">
               <CardTitle className="text-base">Recent Cases</CardTitle>
@@ -440,10 +511,10 @@ export default function Dashboard() {
           </Card>
         </div>
 
-        {/* Right panel */}
+        {/* ── Right panel ── */}
         <div className="lg:col-span-2 space-y-6">
 
-          {/* Upcoming Limitation Dates — original rendering logic, untouched */}
+          {/* Upcoming Limitation Dates */}
           <Card>
             <CardHeader className="pb-2 flex-row items-center justify-between">
               <CardTitle className="text-base">Upcoming Limitation Dates</CardTitle>
@@ -487,7 +558,7 @@ export default function Dashboard() {
             </CardContent>
           </Card>
 
-          {/* Recent Activities — original rendering logic, untouched */}
+          {/* Recent Activities */}
           <Card>
             <CardHeader className="pb-2 flex-row items-center justify-between">
               <CardTitle className="text-base">Recent Activities</CardTitle>
@@ -519,7 +590,7 @@ export default function Dashboard() {
             </CardContent>
           </Card>
 
-          {/* Calendar Overview — new */}
+          {/* Calendar Overview */}
           <Card>
             <CardHeader className="pb-2 flex-row items-center justify-between">
               <CardTitle className="text-base">Calendar Overview</CardTitle>
@@ -534,7 +605,7 @@ export default function Dashboard() {
         </div>
       </div>
 
-      {/* Quick Actions */}
+      {/* ── Quick Actions ── */}
       <Card>
         <CardHeader className="pb-3">
           <CardTitle className="text-base">Quick Actions</CardTitle>
