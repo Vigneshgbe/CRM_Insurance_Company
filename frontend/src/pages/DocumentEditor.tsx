@@ -34,11 +34,10 @@ function useAutoSave(
   const [saveError, setSaveError]   = useState(false);
   const dirtyRef                    = useRef(false);
 
-  // Called by the editor whenever content changes
   const markDirty = useCallback(() => { dirtyRef.current = true; }, []);
 
   const saveNow = useCallback(async (): Promise<boolean> => {
-    if (!dirtyRef.current) return true;          // nothing changed
+    if (!dirtyRef.current) return true;
     if (!enabled) return false;
 
     const title   = getTitle();
@@ -75,7 +74,6 @@ function useAutoSave(
     }
   }, [docId, getContent, getTitle, getCaseId, enabled]);
 
-  // Periodic auto-save
   useEffect(() => {
     if (!enabled) return;
     const t = setInterval(() => { saveNow(); }, AUTOSAVE_MS);
@@ -127,7 +125,6 @@ export default function DocumentEditor() {
   const { toast }      = useToast();
   const { user }       = useAuth();
 
-  // Admin check — same pattern as Settings.tsx
   const isAdmin = (() => {
     if (!user) return false;
     const role = (user as any).display_role || (user as any).displayRole || "";
@@ -137,9 +134,8 @@ export default function DocumentEditor() {
       return (raw?.display_role || raw?.displayRole || "") === "Admin";
     } catch { return false; }
   })();
-  const [searchParams] = useSearchParams();
 
-  // URL params:  ?id=<docId>  and/or  ?caseId=<caseId>
+  const [searchParams] = useSearchParams();
   const urlDocId  = searchParams.get("id");
   const urlCaseId = searchParams.get("caseId");
 
@@ -148,10 +144,10 @@ export default function DocumentEditor() {
   const [title,   setTitle]   = useState("Untitled Document");
   const [loading, setLoading] = useState(!!urlDocId);
   const [hasUnsaved, setHasUnsaved] = useState(false);
+  const [wordCount,  setWordCount]  = useState(0);
 
-  // ── Document list panel (new) ─────────────────────────────────────────────
-  const [showDocList,  setShowDocList]  = useState(!urlDocId); // open by default when no doc loaded
-  const [docList,      setDocList]      = useState<any[]>([]);
+  const [showDocList,    setShowDocList]    = useState(!urlDocId);
+  const [docList,        setDocList]        = useState<any[]>([]);
   const [docListLoading, setDocListLoading] = useState(false);
 
   const loadDocList = useCallback(() => {
@@ -170,16 +166,12 @@ export default function DocumentEditor() {
       .finally(() => setDocListLoading(false));
   }, [toast]);
 
-  // Load doc list whenever panel opens
   useEffect(() => {
     if (showDocList) loadDocList();
   }, [showDocList, loadDocList]);
 
-  // Open a saved document from the list
   const openDoc = (doc: any) => {
-    // Navigate to editor with the doc id so it loads fresh
     navigate(`/document-editor?id=${doc.id}`, { replace: false });
-    // Also do an immediate local load without full remount
     setShowDocList(false);
     setLoading(true);
     fetch(`${API_BASE_URL}/editor-documents/${doc.id}`, {
@@ -193,6 +185,7 @@ export default function DocumentEditor() {
         if (editorRef.current) {
           editorRef.current.innerHTML = data.content || "";
           contentRef.current = data.content || "";
+          updateWordCount(data.content || "");
         }
         setDocId(data.id);
         setHasUnsaved(false);
@@ -202,7 +195,6 @@ export default function DocumentEditor() {
       .finally(() => setLoading(false));
   };
 
-  // New blank document
   const newDoc = () => {
     setDocId(null);
     setCaseId(null);
@@ -211,14 +203,14 @@ export default function DocumentEditor() {
     caseIdRef.current = null;
     if (editorRef.current) { editorRef.current.innerHTML = ""; }
     contentRef.current = "";
+    setWordCount(0);
     setHasUnsaved(false);
     setShowDocList(false);
     window.history.replaceState(null, "", "/document-editor");
   };
 
-  // ── Delete a saved document (Admin only) ─────────────────────────────────
   const handleDeleteDoc = async (e: React.MouseEvent, doc: any) => {
-    e.stopPropagation(); // prevent opening the doc
+    e.stopPropagation();
     if (!confirm(`Delete "${doc.title || "Untitled Document"}"? This cannot be undone.`)) return;
     try {
       const res = await fetch(`${API_BASE_URL}/editor-documents/${doc.id}`, {
@@ -229,10 +221,7 @@ export default function DocumentEditor() {
         const body = await res.json().catch(() => ({}));
         throw new Error(body.error || `HTTP ${res.status}`);
       }
-      // If the deleted doc is currently open, clear the editor
-      if (docId === doc.id) {
-        newDoc();
-      }
+      if (docId === doc.id) { newDoc(); }
       setDocList(prev => prev.filter(d => d.id !== doc.id));
       toast({ title: "Document deleted" });
     } catch (err: any) {
@@ -240,27 +229,29 @@ export default function DocumentEditor() {
     }
   };
 
-  const editorRef    = useRef<HTMLDivElement>(null);
-  const contentRef   = useRef("");
-  const titleRef     = useRef(title);
-  const caseIdRef    = useRef(caseId);
+  const editorRef  = useRef<HTMLDivElement>(null);
+  const contentRef = useRef("");
+  const titleRef   = useRef(title);
+  const caseIdRef  = useRef(caseId);
 
-  // Keep refs in sync with state so auto-save always reads latest value
   useEffect(() => { titleRef.current  = title;  }, [title]);
   useEffect(() => { caseIdRef.current = caseId; }, [caseId]);
 
-  const getContent = useCallback(() => contentRef.current,      []);
-  const getTitle   = useCallback(() => titleRef.current,        []);
-  const getCaseId  = useCallback(() => caseIdRef.current,       []);
+  const getContent = useCallback(() => contentRef.current, []);
+  const getTitle   = useCallback(() => titleRef.current,   []);
+  const getCaseId  = useCallback(() => caseIdRef.current,  []);
 
-  const {
-    lastSaved, saving, saveError, markDirty, saveNow,
-  } = useAutoSave(docId, getContent, getTitle, getCaseId, !loading);
+  const { lastSaved, saving, saveError, markDirty, saveNow } =
+    useAutoSave(docId, getContent, getTitle, getCaseId, !loading);
 
-  // ── Load existing document from DB ─────────────────────────────────────────
+  // ── Word count helper (reads existing contentRef, no new state logic) ──────
+  const updateWordCount = (html: string) => {
+    const text = html.replace(/<[^>]*>/g, " ").replace(/\s+/g, " ").trim();
+    setWordCount(text ? text.split(" ").length : 0);
+  };
+
   useEffect(() => {
     if (!urlDocId) { setLoading(false); return; }
-
     setLoading(true);
     fetch(`${API_BASE_URL}/editor-documents/${urlDocId}`, {
       headers: { Authorization: `Bearer ${getToken()}` },
@@ -273,6 +264,7 @@ export default function DocumentEditor() {
         if (editorRef.current) {
           editorRef.current.innerHTML = data.content || "";
           contentRef.current = data.content || "";
+          updateWordCount(data.content || "");
         }
         setDocId(data.id);
       })
@@ -283,7 +275,6 @@ export default function DocumentEditor() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [urlDocId]);
 
-  // ── Warn on unsaved changes before browser navigation ─────────────────────
   useEffect(() => {
     const handler = (e: BeforeUnloadEvent) => {
       if (hasUnsaved) { e.preventDefault(); e.returnValue = ""; }
@@ -292,16 +283,15 @@ export default function DocumentEditor() {
     return () => window.removeEventListener("beforeunload", handler);
   }, [hasUnsaved]);
 
-  // ── Editor input handler ───────────────────────────────────────────────────
   const handleInput = useCallback(() => {
     if (editorRef.current) {
       contentRef.current = editorRef.current.innerHTML;
+      updateWordCount(editorRef.current.innerHTML);
       setHasUnsaved(true);
       markDirty();
     }
   }, [markDirty]);
 
-  // ── Toolbar commands ───────────────────────────────────────────────────────
   const execCmd = (cmd: string, value?: string) => {
     document.execCommand(cmd, false, value);
     editorRef.current?.focus();
@@ -340,9 +330,8 @@ export default function DocumentEditor() {
     if (url) execCmd("insertImage", url);
   };
 
-  // ── Manual save (Save button) ──────────────────────────────────────────────
   const handleSave = async () => {
-    markDirty();               // force save even if auto-save didn't fire yet
+    markDirty();
     const title   = getTitle();
     const content = getContent();
     const cId     = getCaseId();
@@ -366,10 +355,8 @@ export default function DocumentEditor() {
       if (!res.ok) throw new Error("Save failed");
       const data = await res.json();
 
-      // If this was a new doc, update the URL so future saves use PUT
       if (isNew && data.id) {
         setDocId(data.id);
-        // Silently update URL so refresh doesn't create a duplicate
         window.history.replaceState(
           null, "",
           `${window.location.pathname}?id=${data.id}${cId ? `&caseId=${cId}` : ""}`,
@@ -383,167 +370,123 @@ export default function DocumentEditor() {
     }
   };
 
-  // ── PDF export via browser print dialog (accurate HTML rendering) ──────────
   const handleExportPDF = () => {
     const content = contentRef.current;
     const docTitle = titleRef.current || "Document";
-
     const printWindow = window.open("", "_blank");
     if (!printWindow) {
       toast({ title: "Popup blocked", description: "Please allow popups for this site.", variant: "destructive" });
       return;
     }
-
     printWindow.document.write(`
-      <!DOCTYPE html>
-      <html>
+      <!DOCTYPE html><html>
         <head>
           <title>${docTitle}</title>
           <style>
             @page { size: letter; margin: 25mm 20mm; }
-            body {
-              font-family: 'Times New Roman', Times, serif;
-              font-size: 12pt;
-              line-height: 1.6;
-              color: #000;
-            }
+            body { font-family: 'Times New Roman', Times, serif; font-size: 12pt; line-height: 1.6; color: #000; }
             h1 { font-size: 20pt; margin-bottom: 4pt; }
-            h2 { font-size: 16pt; }
-            h3 { font-size: 14pt; }
+            h2 { font-size: 16pt; } h3 { font-size: 14pt; }
             table { border-collapse: collapse; width: 100%; margin: 8pt 0; }
             td, th { border: 1px solid #000; padding: 6pt; }
             img { max-width: 100%; }
-            .doc-title {
-              font-size: 18pt;
-              font-weight: bold;
-              text-align: center;
-              margin-bottom: 12pt;
-              padding-bottom: 6pt;
-              border-bottom: 1px solid #000;
-            }
+            .doc-title { font-size: 18pt; font-weight: bold; text-align: center; margin-bottom: 12pt; padding-bottom: 6pt; border-bottom: 1px solid #000; }
           </style>
         </head>
-        <body>
-          <div class="doc-title">${docTitle}</div>
-          ${content}
-        </body>
-      </html>
-    `);
+        <body><div class="doc-title">${docTitle}</div>${content}</body>
+      </html>`);
     printWindow.document.close();
     printWindow.focus();
     setTimeout(() => { printWindow.print(); }, 400);
   };
 
-  // ── DOCX export — real .docx via HTML-to-Word conversion ──────────────────
   const handleExportDOCX = () => {
     const content = contentRef.current;
     const docTitle = titleRef.current || "Document";
-
-    // Word-compatible HTML with mso namespace for .docx-like rendering in Word
     const wordHtml = `
       <html xmlns:o='urn:schemas-microsoft-com:office:office'
             xmlns:w='urn:schemas-microsoft-com:office:word'
             xmlns='http://www.w3.org/TR/REC-html40'>
         <head>
-          <meta charset="utf-8">
-          <title>${docTitle}</title>
-          <!--[if gte mso 9]>
-          <xml>
-            <w:WordDocument>
-              <w:View>Print</w:View>
-              <w:Zoom>90</w:Zoom>
-              <w:DoNotOptimizeForBrowser/>
-            </w:WordDocument>
-          </xml>
-          <![endif]-->
+          <meta charset="utf-8"><title>${docTitle}</title>
+          <!--[if gte mso 9]><xml><w:WordDocument><w:View>Print</w:View><w:Zoom>90</w:Zoom><w:DoNotOptimizeForBrowser/></w:WordDocument></xml><![endif]-->
           <style>
             body { font-family: Calibri, sans-serif; font-size: 11pt; margin: 0; }
-            h1   { font-size: 20pt; }
-            h2   { font-size: 16pt; }
-            h3   { font-size: 14pt; }
+            h1 { font-size: 20pt; } h2 { font-size: 16pt; } h3 { font-size: 14pt; }
             table { border-collapse: collapse; width: 100%; }
             td, th { border: 1px solid #000; padding: 4pt 6pt; }
           </style>
         </head>
-        <body>
-          <h1>${docTitle}</h1>
-          ${content}
-        </body>
-      </html>
-    `;
-
-    const blob = new Blob(["\ufeff", wordHtml], {
-      type: "application/msword",
-    });
+        <body><h1>${docTitle}</h1>${content}</body>
+      </html>`;
+    const blob = new Blob(["\ufeff", wordHtml], { type: "application/msword" });
     const url = URL.createObjectURL(blob);
-    const a   = document.createElement("a");
-    a.href     = url;
+    const a = document.createElement("a");
+    a.href = url;
     a.download = `${docTitle.replace(/[^a-zA-Z0-9 _-]/g, "")}.doc`;
     a.click();
     URL.revokeObjectURL(url);
     toast({ title: "Document exported", description: `${docTitle}.doc downloaded. Open in Microsoft Word.` });
   };
 
-  // ── Close / back ──────────────────────────────────────────────────────────
   const handleClose = async () => {
     if (hasUnsaved) {
       const ok = confirm("You have unsaved changes. Save before leaving?");
-      if (ok) {
-        await handleSave();
-      }
+      if (ok) { await handleSave(); }
     }
     navigate(-1);
   };
 
   // ── Status indicator ──────────────────────────────────────────────────────
   const StatusIndicator = () => {
-    if (loading)   return <span className="text-xs text-muted-foreground flex items-center gap-1"><Loader2 className="h-3 w-3 animate-spin" /> Loading...</span>;
-    if (saving)    return <span className="text-xs text-muted-foreground flex items-center gap-1"><Loader2 className="h-3 w-3 animate-spin" /> Saving...</span>;
-    if (saveError) return <span className="text-xs text-red-500 flex items-center gap-1"><CloudOff className="h-3 w-3" /> Save failed</span>;
-    if (lastSaved) return <span className="text-xs text-muted-foreground flex items-center gap-1"><Cloud className="h-3 w-3" /> Saved {lastSaved.toLocaleTimeString()}</span>;
-    if (hasUnsaved) return <span className="text-xs text-amber-500">Unsaved changes</span>;
+    if (loading)    return <span className="flex items-center gap-1.5 text-xs text-muted-foreground"><Loader2 className="h-3 w-3 animate-spin" />Loading…</span>;
+    if (saving)     return <span className="flex items-center gap-1.5 text-xs text-muted-foreground"><Loader2 className="h-3 w-3 animate-spin" />Saving…</span>;
+    if (saveError)  return <span className="flex items-center gap-1.5 text-xs text-destructive"><CloudOff className="h-3 w-3" />Save failed</span>;
+    if (lastSaved)  return <span className="flex items-center gap-1.5 text-xs text-success"><Cloud className="h-3 w-3" />Saved {lastSaved.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}</span>;
+    if (hasUnsaved) return <span className="flex items-center gap-1.5 text-xs text-warning"><span className="h-1.5 w-1.5 rounded-full bg-warning inline-block" />Unsaved</span>;
     return null;
   };
 
   // ── Render ────────────────────────────────────────────────────────────────
-  //
-  // Layout: AppSidebar is fixed left-0 w-60 z-30 (same as all other pages).
-  // The editor shell is offset with ml-60 so it sits to the right of the
-  // sidebar — exactly how AppLayout works on every other page. The outer div
-  // is still full-screen height but no longer covers the sidebar.
-  //
   return (
-    <div className="min-h-screen bg-background">
-      {/* ── App Sidebar — identical to every other page ─────────────────── */}
+    <div className="min-h-screen bg-muted/30">
       <AppSidebar />
 
-      {/* ── Editor shell — offset right of the sidebar ──────────────────── */}
       <div className="md:ml-60 flex flex-col h-screen">
 
-        {/* ── Top Bar ───────────────────────────────────────────────────── */}
+        {/* ── Top Bar ── */}
         <div className="flex items-center justify-between px-4 h-14 border-b bg-background shadow-sm shrink-0">
-          <div className="flex items-center gap-3 flex-1 min-w-0">
-            {/* Documents list toggle */}
+          <div className="flex items-center gap-2 flex-1 min-w-0">
+
+            {/* Docs panel toggle */}
             <button
               onClick={() => setShowDocList(v => !v)}
               title="My Documents"
-              className="flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground border rounded px-2 h-7 shrink-0 transition-colors hover:bg-muted/50"
+              className={`flex items-center gap-1.5 text-xs border rounded-md px-2.5 h-8 shrink-0 transition-colors ${
+                showDocList
+                  ? "bg-primary text-primary-foreground border-primary"
+                  : "text-muted-foreground hover:text-foreground hover:bg-muted border-border"
+              }`}
             >
               <FolderOpen className="h-3.5 w-3.5" />
-              <span className="hidden sm:inline">My Docs</span>
+              <span className="hidden sm:inline font-medium">My Docs</span>
             </button>
 
-            {/* New document button */}
+            {/* New doc */}
             <button
               onClick={newDoc}
               title="New Document"
-              className="flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground border rounded px-2 h-7 shrink-0 transition-colors hover:bg-muted/50"
+              className="flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground border border-border rounded-md px-2.5 h-8 shrink-0 transition-colors hover:bg-muted"
             >
               <Plus className="h-3.5 w-3.5" />
-              <span className="hidden sm:inline">New</span>
+              <span className="hidden sm:inline font-medium">New</span>
             </button>
 
-            <FileText className="h-5 w-5 text-primary shrink-0" />
+            {/* Divider */}
+            <div className="w-px h-5 bg-border mx-1 shrink-0" />
+
+            {/* Doc icon + title input */}
+            <FileText className="h-4 w-4 text-primary shrink-0" />
             <Input
               value={title}
               onChange={e => {
@@ -553,47 +496,62 @@ export default function DocumentEditor() {
                 markDirty();
               }}
               placeholder="Untitled Document"
-              className="h-9 text-base font-medium max-w-sm border-none shadow-none focus-visible:ring-0 px-0"
+              className="h-8 text-sm font-semibold max-w-xs border-none shadow-none focus-visible:ring-0 px-1 bg-transparent"
             />
+
+            {/* Doc ID chip */}
             {docId && (
-              <span className="text-xs text-muted-foreground hidden md:block truncate max-w-[180px]">
-                ID: {docId.slice(0, 8)}…
+              <span className="hidden lg:inline text-[10px] text-muted-foreground bg-muted px-2 py-0.5 rounded-full font-mono truncate max-w-[120px]">
+                {docId.slice(0, 8)}…
               </span>
             )}
           </div>
 
-          <div className="flex items-center gap-2">
-            <span className="hidden sm:block"><StatusIndicator /></span>
+          {/* Right side: status + actions */}
+          <div className="flex items-center gap-2 shrink-0">
+            <span className="hidden md:flex"><StatusIndicator /></span>
 
-            <Button size="sm" onClick={handleSave} disabled={saving || loading}>
+            {/* Word count */}
+            <span className="hidden lg:inline text-xs text-muted-foreground bg-muted px-2 py-1 rounded-md">
+              {wordCount.toLocaleString()} words
+            </span>
+
+            <div className="w-px h-5 bg-border mx-1" />
+
+            <Button size="sm" onClick={handleSave} disabled={saving || loading}
+              className="h-8 text-xs gap-1.5">
               {saving
-                ? <><Loader2 className="h-4 w-4 mr-1 animate-spin" /> Saving</>
-                : <><Save className="h-4 w-4 mr-1" /> Save</>
-              }
+                ? <><Loader2 className="h-3.5 w-3.5 animate-spin" />Saving…</>
+                : <><Save className="h-3.5 w-3.5" />Save</>}
             </Button>
 
-            <Button variant="outline" size="sm" onClick={handleExportPDF} className="hidden sm:inline-flex" disabled={loading}>
-              <FileDown className="h-4 w-4 mr-1" /> PDF
+            <Button variant="outline" size="sm" onClick={handleExportPDF}
+              className="hidden sm:inline-flex h-8 text-xs gap-1.5" disabled={loading}>
+              <FileDown className="h-3.5 w-3.5" />PDF
             </Button>
 
-            <Button variant="outline" size="sm" onClick={handleExportDOCX} className="hidden sm:inline-flex" disabled={loading}>
-              <FileDown className="h-4 w-4 mr-1" /> DOCX
+            <Button variant="outline" size="sm" onClick={handleExportDOCX}
+              className="hidden sm:inline-flex h-8 text-xs gap-1.5" disabled={loading}>
+              <FileDown className="h-3.5 w-3.5" />DOCX
             </Button>
 
-            <Button variant="ghost" size="sm" onClick={handleClose}>
+            <button onClick={handleClose}
+              className="h-8 w-8 flex items-center justify-center rounded-md text-muted-foreground hover:text-foreground hover:bg-muted transition-colors">
               <X className="h-4 w-4" />
-            </Button>
+            </button>
           </div>
         </div>
 
-        {/* ── Toolbar ───────────────────────────────────────────────────── */}
-        <div className="flex items-center gap-1 px-4 py-1.5 border-b bg-muted/30 overflow-x-auto shrink-0">
+        {/* ── Toolbar ── */}
+        <div className="flex items-center gap-0.5 px-3 py-1.5 border-b bg-background shrink-0 overflow-x-auto">
+
+          {/* Format block selector */}
           <select
             onChange={e => handleFormatBlock(e.target.value)}
-            className="h-7 text-xs rounded border border-input bg-background px-2 mr-1"
+            className="h-7 text-xs rounded-md border border-input bg-muted/50 px-2 mr-2 text-foreground cursor-pointer"
             defaultValue=""
           >
-            <option value="" disabled>Format</option>
+            <option value="" disabled>Style</option>
             <option value="p">Normal</option>
             <option value="h1">Heading 1</option>
             <option value="h2">Heading 2</option>
@@ -603,15 +561,16 @@ export default function DocumentEditor() {
             <option value="pre">Code Block</option>
           </select>
 
+          {/* Toolbar groups */}
           {TOOLBAR_GROUPS.map((group, gi) => (
             <div key={gi} className="flex items-center gap-0.5">
-              {gi > 0 && <div className="w-px h-5 bg-border mx-1" />}
+              {gi > 0 && <div className="w-px h-4 bg-border mx-1.5" />}
               {group.items.map(item => (
                 <button
                   key={item.cmd}
                   onClick={() => execCmd(item.cmd)}
                   title={item.label}
-                  className="h-7 w-7 flex items-center justify-center rounded hover:bg-accent text-foreground/70 hover:text-foreground transition-colors"
+                  className="h-7 w-7 flex items-center justify-center rounded-md text-foreground/60 hover:text-foreground hover:bg-muted transition-colors"
                 >
                   <item.icon className="h-3.5 w-3.5" />
                 </button>
@@ -619,105 +578,130 @@ export default function DocumentEditor() {
             </div>
           ))}
 
-          <div className="w-px h-5 bg-border mx-1" />
-          <button onClick={insertTable} title="Insert Table"
-            className="h-7 w-7 flex items-center justify-center rounded hover:bg-accent text-foreground/70 hover:text-foreground transition-colors">
-            <Table className="h-3.5 w-3.5" />
-          </button>
-          <button onClick={insertLink} title="Insert Link"
-            className="h-7 w-7 flex items-center justify-center rounded hover:bg-accent text-foreground/70 hover:text-foreground transition-colors">
-            <Link className="h-3.5 w-3.5" />
-          </button>
-          <button onClick={insertImage} title="Insert Image"
-            className="h-7 w-7 flex items-center justify-center rounded hover:bg-accent text-foreground/70 hover:text-foreground transition-colors">
-            <Image className="h-3.5 w-3.5" />
-          </button>
-          <button onClick={() => execCmd("removeFormat")} title="Clear Formatting"
-            className="h-7 w-7 flex items-center justify-center rounded hover:bg-accent text-foreground/70 hover:text-foreground transition-colors">
-            <Code className="h-3.5 w-3.5" />
-          </button>
+          {/* Extra commands */}
+          <div className="w-px h-4 bg-border mx-1.5" />
+          {[
+            { fn: insertTable,                          icon: Table,  label: "Insert Table"  },
+            { fn: insertLink,                           icon: Link,   label: "Insert Link"   },
+            { fn: insertImage,                          icon: Image,  label: "Insert Image"  },
+            { fn: () => execCmd("removeFormat"),        icon: Code,   label: "Clear Format"  },
+          ].map(({ fn, icon: Icon, label }) => (
+            <button key={label} onClick={fn} title={label}
+              className="h-7 w-7 flex items-center justify-center rounded-md text-foreground/60 hover:text-foreground hover:bg-muted transition-colors">
+              <Icon className="h-3.5 w-3.5" />
+            </button>
+          ))}
         </div>
 
-        {/* ── Main body: doc list panel OR editor ───────────────────────── */}
+        {/* ── Body: doc list panel + editor ── */}
         <div className="flex flex-1 min-h-0 overflow-hidden">
 
-          {/* ── Document List Panel (slides in when showDocList = true) ─── */}
+          {/* ── Document list panel ── */}
           {showDocList && (
-            <div className="w-72 shrink-0 border-r bg-background flex flex-col overflow-hidden">
-              <div className="flex items-center justify-between px-3 py-2 border-b">
-                <span className="text-xs font-semibold text-foreground">Saved Documents</span>
+            <div className="w-68 shrink-0 border-r bg-background flex flex-col overflow-hidden"
+              style={{ width: "272px" }}>
+
+              {/* Panel header */}
+              <div className="flex items-center justify-between px-4 py-3 border-b bg-muted/20">
+                <div className="flex items-center gap-2">
+                  <FileText className="h-4 w-4 text-primary" />
+                  <span className="text-sm font-semibold text-foreground">Documents</span>
+                  {docList.length > 0 && (
+                    <span className="text-[10px] bg-primary/10 text-primary px-1.5 py-0.5 rounded-full font-medium">
+                      {docList.length}
+                    </span>
+                  )}
+                </div>
                 <div className="flex items-center gap-1">
-                  <button
-                    onClick={newDoc}
-                    title="New Document"
-                    className="h-6 w-6 flex items-center justify-center rounded hover:bg-accent text-muted-foreground hover:text-foreground transition-colors"
-                  >
+                  <button onClick={newDoc} title="New Document"
+                    className="h-7 w-7 flex items-center justify-center rounded-md hover:bg-muted text-muted-foreground hover:text-foreground transition-colors">
                     <Plus className="h-3.5 w-3.5" />
                   </button>
-                  <button
-                    onClick={() => setShowDocList(false)}
-                    title="Close panel"
-                    className="h-6 w-6 flex items-center justify-center rounded hover:bg-accent text-muted-foreground hover:text-foreground transition-colors"
-                  >
+                  <button onClick={() => setShowDocList(false)} title="Close"
+                    className="h-7 w-7 flex items-center justify-center rounded-md hover:bg-muted text-muted-foreground hover:text-foreground transition-colors">
                     <ChevronLeft className="h-3.5 w-3.5" />
                   </button>
                 </div>
               </div>
 
-              <div className="flex-1 overflow-y-auto">
+              {/* New doc CTA */}
+              <div className="px-3 py-2 border-b">
+                <button onClick={newDoc}
+                  className="w-full flex items-center gap-2 px-3 py-2 rounded-lg border border-dashed border-border text-xs text-muted-foreground hover:border-primary/40 hover:text-primary hover:bg-primary/5 transition-colors">
+                  <Plus className="h-3.5 w-3.5" />
+                  New document
+                </button>
+              </div>
+
+              {/* Doc list */}
+              <div className="flex-1 overflow-y-auto py-1">
                 {docListLoading ? (
-                  <div className="flex items-center justify-center py-10 text-muted-foreground">
-                    <Loader2 className="h-5 w-5 animate-spin mr-2" />
-                    <span className="text-xs">Loading...</span>
+                  <div className="flex flex-col items-center justify-center py-12 gap-2 text-muted-foreground">
+                    <Loader2 className="h-5 w-5 animate-spin" />
+                    <span className="text-xs">Loading…</span>
                   </div>
                 ) : docList.length === 0 ? (
-                  <div className="flex flex-col items-center justify-center py-10 gap-2 text-muted-foreground px-4 text-center">
-                    <FileText className="h-8 w-8 opacity-30" />
-                    <p className="text-xs">No saved documents yet.</p>
-                    <button
-                      onClick={newDoc}
-                      className="text-xs text-primary hover:underline"
-                    >
-                      Create your first document
+                  <div className="flex flex-col items-center justify-center py-12 gap-3 px-4 text-center">
+                    <div className="h-12 w-12 rounded-full bg-muted flex items-center justify-center">
+                      <FileText className="h-6 w-6 text-muted-foreground/40" />
+                    </div>
+                    <div>
+                      <p className="text-sm font-medium text-foreground">No documents yet</p>
+                      <p className="text-xs text-muted-foreground mt-0.5">Create your first document to get started</p>
+                    </div>
+                    <button onClick={newDoc}
+                      className="text-xs text-primary hover:underline font-medium">
+                      Create document →
                     </button>
                   </div>
                 ) : (
-                  <ul className="divide-y">
+                  <ul className="px-2 space-y-0.5">
                     {docList.map((doc: any) => (
                       <li key={doc.id} className="relative group/item">
                         <button
                           onClick={() => openDoc(doc)}
-                          className={`w-full text-left px-3 py-2.5 hover:bg-muted/50 transition-colors ${docId === doc.id ? "bg-primary/5 border-l-2 border-primary" : ""}`}
+                          className={`w-full text-left px-3 py-2.5 rounded-lg transition-colors ${
+                            docId === doc.id
+                              ? "bg-primary/10 ring-1 ring-primary/20"
+                              : "hover:bg-muted/60"
+                          }`}
                         >
-                          <div className="flex items-start gap-2 pr-6">
-                            <FileText className={`h-3.5 w-3.5 mt-0.5 shrink-0 ${docId === doc.id ? "text-primary" : "text-muted-foreground"}`} />
+                          <div className="flex items-start gap-2.5 pr-7">
+                            <div className={`h-7 w-7 rounded-md flex items-center justify-center shrink-0 mt-0.5 ${
+                              docId === doc.id ? "bg-primary/20 text-primary" : "bg-muted text-muted-foreground"
+                            }`}>
+                              <FileText className="h-3.5 w-3.5" />
+                            </div>
                             <div className="min-w-0 flex-1">
-                              <p className={`text-xs font-medium truncate ${docId === doc.id ? "text-primary" : "text-foreground"}`}>
+                              <p className={`text-xs font-semibold truncate leading-tight ${
+                                docId === doc.id ? "text-primary" : "text-foreground"
+                              }`}>
                                 {doc.title || "Untitled Document"}
                               </p>
                               {doc.updated_at && (
-                                <p className="text-[10px] text-muted-foreground flex items-center gap-1 mt-0.5">
-                                  <Clock className="h-2.5 w-2.5" />
+                                <p className="text-[10px] text-muted-foreground flex items-center gap-1 mt-1">
+                                  <Clock className="h-2.5 w-2.5 shrink-0" />
                                   {new Date(doc.updated_at).toLocaleDateString("en-CA", {
-                                    month: "short", day: "numeric", year: "numeric",
+                                    month: "short", day: "numeric",
                                     hour: "2-digit", minute: "2-digit",
                                   })}
                                 </p>
                               )}
                               {doc.case_id && (
-                                <p className="text-[10px] text-muted-foreground mt-0.5 truncate">
+                                <span className="inline-block mt-1 text-[9px] bg-primary/10 text-primary px-1.5 py-0.5 rounded font-medium">
                                   Case linked
-                                </p>
+                                </span>
                               )}
                             </div>
                           </div>
                         </button>
-                        {/* Delete button — Admin only, appears on hover */}
+
+                        {/* Delete — Admin only */}
                         {isAdmin && (
                           <button
                             onClick={(e) => handleDeleteDoc(e, doc)}
                             title="Delete document"
-                            className="absolute right-2 top-1/2 -translate-y-1/2 h-6 w-6 flex items-center justify-center rounded opacity-0 group-hover/item:opacity-100 transition-opacity hover:bg-destructive/10 text-muted-foreground hover:text-destructive"
+                            className="absolute right-2 top-1/2 -translate-y-1/2 h-6 w-6 flex items-center justify-center rounded-md opacity-0 group-hover/item:opacity-100 transition-opacity hover:bg-destructive/10 text-muted-foreground hover:text-destructive"
                           >
                             <Trash2 className="h-3 w-3" />
                           </button>
@@ -728,41 +712,64 @@ export default function DocumentEditor() {
                 )}
               </div>
 
-              <div className="border-t px-3 py-2">
-                <p className="text-[10px] text-muted-foreground">{docList.length} document{docList.length !== 1 ? "s" : ""}</p>
+              {/* Panel footer */}
+              <div className="border-t px-4 py-2 bg-muted/20">
+                <p className="text-[10px] text-muted-foreground">
+                  {docList.length} document{docList.length !== 1 ? "s" : ""}
+                </p>
               </div>
             </div>
           )}
 
-          {/* ── Editor column ──────────────────────────────────────────── */}
+          {/* ── Editor column ── */}
           <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
-            {/* ── Loading overlay ──────────────────────────────────────── */}
+
             {loading && (
-              <div className="flex-1 flex items-center justify-center">
-                <div className="flex items-center gap-3 text-muted-foreground">
-                  <Loader2 className="h-6 w-6 animate-spin" />
-                  <span className="text-sm">Loading document…</span>
+              <div className="flex-1 flex items-center justify-center bg-muted/20">
+                <div className="flex flex-col items-center gap-4 text-muted-foreground">
+                  <div className="h-12 w-12 rounded-full bg-background border flex items-center justify-center shadow-sm">
+                    <Loader2 className="h-6 w-6 animate-spin text-primary" />
+                  </div>
+                  <span className="text-sm font-medium">Loading document…</span>
                 </div>
               </div>
             )}
 
-            {/* ── Editor area ──────────────────────────────────────────── */}
             {!loading && (
-              <div className="flex-1 overflow-auto bg-muted/20">
-                <div className="max-w-4xl mx-auto my-6 px-4">
+              <div className="flex-1 overflow-auto bg-muted/30">
+                {/* Paper canvas */}
+                <div className="max-w-4xl mx-auto my-8 px-6">
                   <div
                     ref={editorRef}
                     contentEditable
                     onInput={handleInput}
-                    className="min-h-[calc(100vh-200px)] bg-background border rounded-md shadow-sm p-8 prose prose-sm max-w-none focus:outline-none focus:ring-2 focus:ring-ring"
-                    style={{ fontFamily: "'Inter', sans-serif" }}
                     suppressContentEditableWarning
+                    className="min-h-[calc(100vh-220px)] bg-background rounded-xl shadow-md border border-border/60 p-10 focus:outline-none focus:ring-2 focus:ring-ring/30"
+                    style={{
+                      fontFamily: "'Inter', system-ui, sans-serif",
+                      fontSize: "14px",
+                      lineHeight: "1.8",
+                      color: "hsl(var(--foreground))",
+                    }}
                   />
+                </div>
+
+                {/* Footer bar — word count + page info */}
+                <div className="max-w-4xl mx-auto px-6 pb-6 flex items-center justify-between">
+                  <span className="text-xs text-muted-foreground">
+                    {wordCount.toLocaleString()} word{wordCount !== 1 ? "s" : ""}
+                  </span>
+                  {docId && (
+                    <span className="text-xs text-muted-foreground font-mono">
+                      {docId.slice(0, 8)}
+                    </span>
+                  )}
                 </div>
               </div>
             )}
           </div>
         </div>
+
       </div>
     </div>
   );
