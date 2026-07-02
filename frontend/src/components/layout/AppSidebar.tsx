@@ -103,6 +103,28 @@ export function AppSidebar() {
         })}
       </nav>
 
+      {/* ── Need Help? — additive only, no existing code changed ── */}
+      <div className="px-3 pb-3">
+        <div className="rounded-lg bg-sidebar-muted p-3">
+          <div className="flex items-center justify-between mb-0.5">
+            <span className="text-sm font-semibold text-sidebar-foreground">Need Help?</span>
+            <div className="h-6 w-6 rounded-full bg-sidebar-accent/40 flex items-center justify-center shrink-0">
+              <svg xmlns="http://www.w3.org/2000/svg" className="h-3.5 w-3.5 text-sidebar-foreground" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M3 18v-6a9 9 0 0 1 18 0v6" />
+                <path d="M21 19a2 2 0 0 1-2 2h-1a2 2 0 0 1-2-2v-3a2 2 0 0 1 2-2h3zM3 19a2 2 0 0 0 2 2h1a2 2 0 0 0 2-2v-3a2 2 0 0 0-2-2H3z" />
+              </svg>
+            </div>
+          </div>
+          <p className="text-xs text-sidebar-foreground/60 mb-2.5">Quick support &amp; resources</p>
+          <a
+            href="mailto:abiram.p@thepadak.com"
+            className="block w-full text-center text-xs font-medium py-1.5 rounded bg-sidebar-accent text-sidebar-foreground hover:opacity-90 transition-opacity"
+          >
+            Contact Support
+          </a>
+        </div>
+      </div>
+
       {/* User footer */}
       <div className="border-t border-sidebar-muted p-4">
         <div className="flex items-center gap-3">
