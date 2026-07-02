@@ -571,7 +571,7 @@ export default function Dashboard() {
             <CardHeader className="pb-2 flex-row items-center justify-between">
               <CardTitle className="text-base">Calendar Overview</CardTitle>
               <Button variant="ghost" size="sm" asChild className="text-xs gap-1 h-7">
-                <Link to="/cases">View Calendar <ArrowRight className="h-3 w-3" /></Link>
+                <Link to="/calendar">View Calendar <ArrowRight className="h-3 w-3" /></Link>
               </Button>
             </CardHeader>
             <CardContent>
