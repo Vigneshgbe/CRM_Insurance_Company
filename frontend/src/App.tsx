@@ -10,7 +10,7 @@ import NewClient from "./pages/NewClient";
 import Cases from "./pages/Cases";
 import CaseDetail from "./pages/CaseDetail";
 import Documents from "./pages/Documents";
-import CalendarPage from "./pages/CalendarPage";
+import CalendarPage from "./pages/Calendar";
 import Templates from "./pages/Templates";
 import TemplateEditor from "./pages/TemplateEditor";
 import Reports from "./pages/Reports";
