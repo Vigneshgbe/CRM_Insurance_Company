@@ -10,6 +10,7 @@ import NewClient from "./pages/NewClient";
 import Cases from "./pages/Cases";
 import CaseDetail from "./pages/CaseDetail";
 import Documents from "./pages/Documents";
+import CalendarPage from "./pages/CalendarPage";
 import Templates from "./pages/Templates";
 import TemplateEditor from "./pages/TemplateEditor";
 import Reports from "./pages/Reports";
@@ -36,6 +37,7 @@ const App = () => (
           <Route path="/cases/:caseId"   element={<AuthGuard allowedRoles={["employee"]}><CaseDetail /></AuthGuard>} />
           <Route path="/cases/:caseId/:tab" element={<AuthGuard allowedRoles={["employee"]}><CaseDetail /></AuthGuard>} />
           <Route path="/documents"       element={<AuthGuard allowedRoles={["employee"]}><Documents /></AuthGuard>} />
+          <Route path="/calendar"        element={<AuthGuard allowedRoles={["employee"]}><CalendarPage /></AuthGuard>} />
           <Route path="/templates"       element={<AuthGuard allowedRoles={["employee"]}><Templates /></AuthGuard>} />
           <Route path="/templates/editor" element={<AuthGuard allowedRoles={["employee"]}><TemplateEditor /></AuthGuard>} />
           <Route path="/document-editor" element={<AuthGuard allowedRoles={["employee"]}><DocumentEditor /></AuthGuard>} />
