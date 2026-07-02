@@ -2,7 +2,7 @@ import { useState, useEffect } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import {
   LayoutDashboard, Users, FolderOpen, FileText, FileTextIcon,
-  BarChart3, Settings, LogOut, FileEdit,
+  BarChart3, Settings, LogOut, FileEdit, CalendarDays,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/lib/auth";
@@ -13,6 +13,7 @@ const navItems = [
   { label: "Clients",   icon: Users,           path: "/clients"         },
   { label: "Cases",     icon: FolderOpen,       path: "/cases"           },
   { label: "Documents", icon: FileText,         path: "/documents"       },
+  { label: "Calendar",  icon: CalendarDays,     path: "/calendar"        },
   { label: "Editor",    icon: FileEdit,         path: "/document-editor" },
   { label: "OCF Forms", icon: FileTextIcon,     path: "/templates"       },
   { label: "Reports",   icon: BarChart3,        path: "/reports"         },
