@@ -14,7 +14,7 @@ const navItems = [
   { label: "Cases",     icon: FolderOpen,       path: "/cases"           },
   { label: "Documents", icon: FileText,         path: "/documents"       },
   { label: "Calendar",  icon: CalendarDays,     path: "/calendar"        },
-  { label: "Editor",    icon: FileEdit,         path: "/document-editor" },
+  { label: "Docx Editor",    icon: FileEdit,         path: "/document-editor" },
   { label: "OCF Forms", icon: FileTextIcon,     path: "/templates"       },
   { label: "Reports",   icon: BarChart3,        path: "/reports"         },
   { label: "Settings",  icon: Settings,         path: "/settings"        },

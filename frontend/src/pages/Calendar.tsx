@@ -174,7 +174,7 @@ export default function CalendarPage() {
       {/* ── Header ── */}
       <div className="flex items-center justify-between mb-6">
         <div>
-          <h2 className="text-lg font-semibold text-foreground">Case Calendar</h2>
+          {/* <h2 className="text-lg font-semibold text-foreground">Case Calendar</h2> */}
           <p className="text-sm text-muted-foreground">Limitation dates and case deadlines overview</p>
         </div>
         <Button variant="outline" size="sm" onClick={goToday} className="gap-2">
