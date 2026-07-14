@@ -29,6 +29,7 @@ import {
 } from '../controllers/misc.controller';
 import { getOcfFormData, saveOcfFormData, getOcfPrefill } from '../controllers/ocf.controller';
 import { generateOcfPdf } from '../controllers/ocf-pdf.controller';
+import { generateIntakePdf } from '../controllers/intake-pdf.controller';
 import {
   listEditorDocuments, getEditorDocument,
   createEditorDocument, updateEditorDocument, deleteEditorDocument,
@@ -146,6 +147,7 @@ router.post('/cases/:caseId/ocf/:formNumber', saveOcfFormData);
 
 // OCF PDF generation — fills real government PDF template and returns download
 router.post('/cases/:caseId/ocf/:formNumber/generate', generateOcfPdf);
+router.post('/cases/:caseId/intake/generate', generateIntakePdf);
 
 // Users
 router.get   ('/users',                  getUsers);
