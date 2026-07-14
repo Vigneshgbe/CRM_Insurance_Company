@@ -1986,7 +1986,45 @@ export default function TemplateFillModal({ templateId, templateName, caseId, on
 
     const formNumber = OCF_FORM_NUMBERS[templateId];
 
-    // Matrix intake or no case selected — fall back to jsPDF
+    // Matrix Intake — use real backend PDF (fills actual Intake_Master.pdf)
+    if (templateId === "matrix-intake" && selectedCaseId) {
+      setExporting(true);
+      try {
+        const response = await fetch(
+          `${API}/cases/${selectedCaseId}/intake/generate`,
+          {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              Authorization: `Bearer ${tok()}`,
+            },
+            body: JSON.stringify({}),
+          }
+        );
+        if (!response.ok) {
+          const errText = await response.text();
+          throw new Error(`Server error ${response.status}: ${errText}`);
+        }
+        const blob = await response.blob();
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement("a");
+        a.href = url;
+        a.download = `Intake_${new Date().toISOString().slice(0, 10)}.pdf`;
+        document.body.appendChild(a);
+        a.click();
+        a.remove();
+        URL.revokeObjectURL(url);
+        toast({ title: "PDF exported successfully", description: templateName });
+      } catch (err: any) {
+        console.error("[Intake export error]", err);
+        toast({ title: "Export failed", description: err.message || "Please try again", variant: "destructive" });
+      } finally {
+        setExporting(false);
+      }
+      return;
+    }
+
+    // All other templates or no case selected — fall back to jsPDF
     if (!formNumber || !selectedCaseId) {
       setExporting(true);
       try {
