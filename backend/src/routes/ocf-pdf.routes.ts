@@ -1,5 +1,6 @@
 import { Router } from 'express';
 import { generateOcfPdf } from '../controllers/ocf-pdf.controller';
+import { generateIntakePdf } from '../controllers/intake-pdf.controller';
 import { authenticate } from '../middlewares/auth.middleware';
 
 const router = Router();
