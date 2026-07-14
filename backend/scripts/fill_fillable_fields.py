@@ -1,6 +1,7 @@
 """
 Self-contained PDF form filler.
 Dependencies: pypdf only (pip install pypdf)
+backend/scripts/fill_fillable_fields.py is a self-contained script that fills in form fields in a PDF file based on values provided in a JSON file. It uses the pypdf library to read and write PDF files.
 Usage: python fill_fillable_fields.py input.pdf field_values.json output.pdf
 """
 import json
