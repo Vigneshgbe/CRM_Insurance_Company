@@ -199,7 +199,7 @@ export async function updateCase(req: Request, res: Response): Promise<void> {
        clientCountry||'Canada', clientMobile||'', abCounsel||'', tortLawFirm||'', tortCounsel||'', caseId]
     );
 
-    // ── Update client name if provided ────────────────────────────────────────
+    // ── Update client name/email if provided ──────────────────────────────────
     if (clientId && (clientFirstName !== undefined || clientLastName !== undefined || clientEmail !== undefined)) {
       const updates: string[] = [];
       const vals: any[] = [];
@@ -224,6 +224,35 @@ export async function updateCase(req: Request, res: Response): Promise<void> {
       }
     }
 
+    // ── Sync case address/mobile → clients table ──────────────────────────────
+    // Mirrors: client_street→address, client_city→city, client_state→province,
+    //          client_zip→post_code, client_mobile→cell_phone
+    // Only runs for fields actually present in the request body (never blanks
+    // a clients field that wasn't sent). Non-fatal: a sync failure never breaks
+    // the case save — it is caught separately below.
+    if (clientId) {
+      const syncCols: string[] = [];
+      const syncVals: any[] = [];
+      if (clientStreet  !== undefined) { syncCols.push('address = ?');    syncVals.push(clientStreet  || ''); }
+      if (clientCity    !== undefined) { syncCols.push('city = ?');       syncVals.push(clientCity    || ''); }
+      if (clientState   !== undefined) { syncCols.push('province = ?');   syncVals.push(clientState   || ''); }
+      if (clientZip     !== undefined) { syncCols.push('post_code = ?');  syncVals.push(clientZip     || ''); }
+      if (clientMobile  !== undefined) { syncCols.push('cell_phone = ?'); syncVals.push(clientMobile  || ''); }
+      if (syncCols.length > 0) {
+        try {
+          syncVals.push(clientId);
+          await pool.query(
+            `UPDATE clients SET ${syncCols.join(', ')} WHERE id = ?`,
+            syncVals
+          );
+        } catch (syncErr) {
+          // Sync failure is logged but never blocks the case save response
+          console.error('[updateCase] address sync to clients failed (non-fatal):', syncErr);
+        }
+      }
+    }
+    // ── End address sync ──────────────────────────────────────────────────────
+
     if (oldStatus && oldStatus !== fileStatus) {
       const user = (req as any).user?.name || 'System';
       await pool.query(
@@ -236,7 +265,7 @@ export async function updateCase(req: Request, res: Response): Promise<void> {
         [generateId(), caseId, fileStatus, user]
       );
 
-      // ── NEW: auto email notification on status change (additive, never blocks save) ──
+      // ── Auto email notification on status change (additive, never blocks save) ──
       try {
         const [rows] = await pool.query(CASE_JOIN + ' WHERE ca.id = ?', [caseId]) as any[];
         const updatedCase = (rows as any[])[0];
@@ -264,9 +293,6 @@ export async function updateCase(req: Request, res: Response): Promise<void> {
 }
 
 // ── NEW: matches StatusTab.tsx's POST /api/cases/:caseId/status ────────────
-// This route never existed before (was 404ing). Pre-existing bug, unrelated
-// to the email feature, fixed here since it shares the same status-change
-// + email-notification logic already built into updateCase above.
 export async function updateCaseStatus(req: Request, res: Response): Promise<void> {
   const caseId = req.params.caseId;
   const { status, changedBy } = req.body;

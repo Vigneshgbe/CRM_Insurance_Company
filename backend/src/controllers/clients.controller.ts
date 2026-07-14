@@ -71,6 +71,7 @@ export async function createClient(req: Request, res: Response): Promise<void> {
 export async function updateClient(req: Request, res: Response): Promise<void> {
   const { firstName, lastName, initial, address, city, province, postCode,
     homePhone, cellPhone, workPhone, email, dateOfBirth, maritalStatus, dependants } = req.body;
+  const clientId = req.params.id;
   try {
     await pool.query(
       `UPDATE clients SET first_name=?, last_name=?, initial=?, address=?, city=?, province=?,
@@ -78,9 +79,38 @@ export async function updateClient(req: Request, res: Response): Promise<void> {
         marital_status=?, dependants=? WHERE id=?`,
       [firstName, lastName, initial||'', address||'', city||'', province||'', postCode||'',
        homePhone||'', cellPhone||'', workPhone||'', email||'', dateOfBirth||null,
-       maritalStatus||'', dependants||0, req.params.id]
+       maritalStatus||'', dependants||0, clientId]
     );
-    const [rows] = await pool.query('SELECT * FROM clients WHERE id = ?', [req.params.id]) as any[];
+
+    // ── Sync client address/mobile → all cases for this client ───────────────
+    // Mirrors: address→client_street, city→client_city, province→client_state,
+    //          post_code→client_zip, cell_phone→client_mobile
+    // Only syncs fields actually present in the request body.
+    // Non-fatal: sync failure is logged but never blocks the client save response.
+    {
+      const syncCols: string[] = [];
+      const syncVals: any[] = [];
+      if (address    !== undefined) { syncCols.push('client_street = ?'); syncVals.push(address    || ''); }
+      if (city       !== undefined) { syncCols.push('client_city = ?');   syncVals.push(city       || ''); }
+      if (province   !== undefined) { syncCols.push('client_state = ?');  syncVals.push(province   || ''); }
+      if (postCode   !== undefined) { syncCols.push('client_zip = ?');    syncVals.push(postCode   || ''); }
+      if (cellPhone  !== undefined) { syncCols.push('client_mobile = ?'); syncVals.push(cellPhone  || ''); }
+      if (syncCols.length > 0) {
+        try {
+          syncVals.push(clientId);
+          await pool.query(
+            `UPDATE cases SET ${syncCols.join(', ')} WHERE client_id = ?`,
+            syncVals
+          );
+        } catch (syncErr) {
+          // Sync failure is logged but never blocks the client save response
+          console.error('[updateClient] address sync to cases failed (non-fatal):', syncErr);
+        }
+      }
+    }
+    // ── End address sync ──────────────────────────────────────────────────────
+
+    const [rows] = await pool.query('SELECT * FROM clients WHERE id = ?', [clientId]) as any[];
     if (!(rows as any[])[0]) { res.status(404).json({ error: 'Client not found' }); return; }
     res.json(mapClient((rows as any[])[0]));
   } catch (err) { res.status(500).json({ error: 'Server error' }); }
